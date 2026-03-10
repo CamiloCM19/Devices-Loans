@@ -19,6 +19,46 @@ Para verificar la configuracion local:
 git remote -v
 ```
 
+## Hosting En Raspberry Pi
+
+IP LAN actual del Pi:
+
+- `10.252.157.185`
+
+Objetivo:
+
+- El Pi hostea Laravel
+- Cualquier laptop o dispositivo conectado al mismo hotspot abre la interfaz en el navegador
+- El ESP8266 envia lecturas al mismo Pi por HTTP
+
+Flujo recomendado en el Raspberry Pi:
+
+```bash
+git clone https://github.com/CamiloCM19/Devices-Loans.git
+cd Devices-Loans
+chmod +x scripts/deploy_pi.sh scripts/start_server_pi.sh
+APP_URL=http://10.252.157.185:8000 ./scripts/deploy_pi.sh
+APP_HOST=0.0.0.0 APP_PORT=8000 ./scripts/start_server_pi.sh
+```
+
+Despues de eso, la interfaz debe abrir desde cualquier equipo en la misma red en:
+
+```text
+http://10.252.157.185:8000
+```
+
+Notas de conexion:
+
+- `APP_URL` en el Pi debe apuntar a `http://10.252.157.185:8000`
+- El servidor ya arranca escuchando en `0.0.0.0`, no solo en `localhost`
+- `scripts/deploy_pi.sh` fuerza SQLite local para que el Pi no dependa de MySQL
+- Para cambios nuevos desde GitHub en el Pi:
+
+```bash
+git pull origin main
+APP_URL=http://10.252.157.185:8000 ./scripts/deploy_pi.sh
+```
+
 ## Control de RFID (Windows)
 
 Para iniciar servidor + frontend (modo ESP8266/RC522 por HTTP):
@@ -43,18 +83,24 @@ Endpoint para ESP8266:
 Importante de red:
 
 - Desde el ESP no uses `127.0.0.1` ni `localhost`.
-- Usa la IP LAN de tu PC (ejemplo actual: `172.16.19.40`).
-- URL ejemplo: `http://172.16.19.40:8000/inventory/scan/esp`
+- Usa la IP LAN del Raspberry Pi.
+- IP actual del Pi: `10.252.157.185`
+- URL ejemplo: `http://10.252.157.185:8000/inventory/scan/esp`
 
 Ejemplo (desde ESP o prueba local):
 
 ```bash
-curl -X POST http://172.16.19.40:8000/inventory/scan/esp ^
+curl -X POST http://10.252.157.185:8000/inventory/scan/esp ^
   -H "Content-Type: application/json" ^
   -d "{\"uid\":\"04A1B2C3\",\"source\":\"esp-lab-1\",\"token\":\"TU_TOKEN\"}"
 ```
 
 Opcional: define `RFID_ESP_TOKEN` en `.env` para proteger el endpoint.
+
+Si el endpoint responde con un tag no registrado, ahora devuelve:
+
+- `register_url`: URL absoluta basada en el host con el que entro la solicitud
+- `register_path`: ruta relativa usable aunque cambie el host/IP actual
 
 Notas:
 - En modo automático, el bridge ignora puertos Bluetooth (BTHENUM) por defecto.

@@ -224,6 +224,7 @@ class InventoryController extends Controller
             'status' => 'unregistered',
             'message' => 'Tag no registrado.',
             'register_url' => route('inventory.register', ['nfc_id' => $input]),
+            'register_path' => route('inventory.register', ['nfc_id' => $input], false),
             'nfc_id' => $input,
         ], 404);
     }

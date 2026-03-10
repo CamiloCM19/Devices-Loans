@@ -7,8 +7,8 @@
 const char* WIFI_SSID = "TU_WIFI";
 const char* WIFI_PASS = "TU_PASS";
 
-// Use PC LAN IP, never localhost/127.0.0.1
-const char* API_URL = "http://172.16.19.40:8000/inventory/scan/esp";
+// Use the Raspberry Pi LAN IP, never localhost/127.0.0.1
+const char* API_URL = "http://10.252.157.185:8000/inventory/scan/esp";
 const char* API_TOKEN = ""; // optional: same as RFID_ESP_TOKEN in .env
 const char* SOURCE_ID = "esp-rc522-1";
 
