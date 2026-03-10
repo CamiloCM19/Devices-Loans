@@ -7,6 +7,18 @@
 <a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/l/laravel/framework" alt="License"></a>
 </p>
 
+## Repositorio Remoto
+
+Este proyecto esta vinculado al repositorio de GitHub:
+
+- `origin`: `https://github.com/CamiloCM19/Devices-Loans.git`
+
+Para verificar la configuracion local:
+
+```powershell
+git remote -v
+```
+
 ## Control de RFID (Windows)
 
 Para iniciar servidor + frontend (modo ESP8266/RC522 por HTTP):
