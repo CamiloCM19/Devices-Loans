@@ -1,0 +1,242 @@
+﻿import argparse
+import re
+import sys
+import time
+
+import pyautogui
+import serial
+from serial.tools import list_ports
+
+
+BLUETOOTH_HINTS = ("bluetooth", "bthenum")
+USB_HINTS = ("usb", "ch340", "cp210", "ftdi", "arduino", "uart", "serial")
+
+
+def is_bluetooth_port(port_info):
+    text = f"{port_info.device} {port_info.description} {port_info.hwid}".lower()
+    return any(h in text for h in BLUETOOTH_HINTS)
+
+
+def list_candidate_ports(include_bluetooth=False):
+    ranked = []
+    for p in list_ports.comports():
+        text = f"{p.device} {p.description} {p.hwid}".lower()
+        is_bt = is_bluetooth_port(p)
+        if is_bt and not include_bluetooth:
+            continue
+
+        score = 0
+        if "usb" in text:
+            score += 100
+        for hint in USB_HINTS:
+            if hint in text:
+                score += 20
+        if getattr(p, "vid", None) is not None:
+            score += 10
+        if getattr(p, "pid", None) is not None:
+            score += 10
+        if is_bt:
+            score -= 120
+
+        ranked.append((score, p.device, p.description, p.hwid, is_bt))
+
+    ranked.sort(key=lambda x: x[0], reverse=True)
+    return ranked
+
+
+def print_ports_snapshot(preferred_port=None, include_bluetooth=False):
+    ports = list(list_ports.comports())
+    if preferred_port:
+        print(f"Waiting for configured port: {preferred_port}")
+        if not ports:
+            print("No serial ports detected.")
+        else:
+            print("Detected ports:")
+            for p in ports:
+                print(f"  - {p.device} | {p.description} | {p.hwid}")
+        return
+
+    candidates = list_candidate_ports(include_bluetooth=include_bluetooth)
+    if candidates:
+        print("Detected candidate serial ports (best first):")
+        for score, device, desc, hwid, is_bt in candidates:
+            bt_note = " [bluetooth]" if is_bt else ""
+            print(f"  - {device} (score={score}){bt_note} | {desc} | {hwid}")
+    elif not ports:
+        print("No serial ports detected.")
+    else:
+        if any(is_bluetooth_port(p) for p in ports):
+            print("Only Bluetooth COM ports detected. Skipping them in automatic mode.")
+            print("If your reader is USB-Serial, verify driver/cable.")
+            print("If you really need Bluetooth serial, run with --include-bluetooth.")
+        else:
+            print("Detected serial ports, but none look like a valid RFID serial device:")
+        for p in ports:
+            print(f"  - {p.device} | {p.description} | {p.hwid}")
+
+
+def extract_uid(line):
+    text = line.strip()
+    if not text:
+        return None
+
+    lower = text.lower()
+    upper = text.upper()
+
+    # Try pair-based UID first: "UID: 04 2A 5C 9E" or "04-2A-5C-9E".
+    pairs = re.findall(r"\b[0-9A-F]{2}\b", upper)
+    if len(pairs) >= 4:
+        return "".join(pairs)
+
+    # Fallback for compact hex outputs: "042A5C9E".
+    compact = re.sub(r"[^0-9A-F]", "", upper)
+    if (
+        8 <= len(compact) <= 32
+        and len(compact) % 2 == 0
+        and ("uid" in lower or "tag" in lower or "card" in lower or re.fullmatch(r"[0-9a-f]+", text))
+    ):
+        return compact
+
+    return None
+
+
+def open_serial(args, avoid_port=None):
+    if args.baud is not None:
+        baud_targets = [args.baud]
+    else:
+        baud_targets = [int(b.strip()) for b in args.baud_candidates.split(",") if b.strip()]
+
+    if args.port:
+        targets = [args.port]
+    else:
+        ranked = list_candidate_ports(include_bluetooth=args.include_bluetooth)
+        targets = [d for _, d, _, _, _ in ranked]
+        if avoid_port and avoid_port in targets and len(targets) > 1:
+            targets = [d for d in targets if d != avoid_port] + [avoid_port]
+
+    if not targets:
+        return None, None, None
+
+    for device in targets:
+        for baud in baud_targets:
+            try:
+                ser = serial.Serial(device, baud, timeout=0.2)
+                time.sleep(1.0)
+                ser.reset_input_buffer()
+                print(f"Connected to {device} @ {baud}")
+                return ser, device, baud
+            except serial.SerialException as exc:
+                print(f"Could not open {device} @ {baud}: {exc}")
+    return None, None, None
+
+
+def main():
+    parser = argparse.ArgumentParser(description="NFC Serial Bridge")
+    parser.add_argument("--port", type=str, default=None, help="COM port (e.g., COM3). If omitted, auto-detects.")
+    parser.add_argument("--baud", type=int, default=None, help="Fixed baud rate. If omitted, auto-tries common rates.")
+    parser.add_argument(
+        "--baud-candidates",
+        type=str,
+        default="115200,57600,38400,19200,9600",
+        help="Comma-separated baud rates to try when --baud is not set",
+    )
+    parser.add_argument("--retry-seconds", type=float, default=2.0, help="Retry interval when disconnected")
+    parser.add_argument(
+        "--snapshot-seconds",
+        type=float,
+        default=15.0,
+        help="How often to print port snapshots while waiting for a valid device",
+    )
+    parser.add_argument(
+        "--rotate-seconds",
+        type=float,
+        default=12.0,
+        help="In auto mode, switch to another port after this many seconds without any UID",
+    )
+    parser.add_argument("--debug", action="store_true", help="Print raw serial lines")
+    parser.add_argument(
+        "--include-bluetooth",
+        action="store_true",
+        help="Also try Bluetooth COM ports in automatic mode (disabled by default)",
+    )
+    args = parser.parse_args()
+
+    print("NFC bridge started. Press Ctrl+C to exit.")
+    if args.port:
+        print(f"Port mode: fixed ({args.port})")
+    else:
+        bt_mode = "enabled" if args.include_bluetooth else "disabled"
+        print(f"Port mode: automatic (bluetooth {bt_mode})")
+    if args.baud is not None:
+        print(f"Baud mode: fixed ({args.baud})")
+    else:
+        print(f"Baud mode: automatic ({args.baud_candidates})")
+
+    ser = None
+    current_port = None
+    current_baud = None
+    avoid_port = None
+    last_uid_at = time.monotonic()
+    last_snapshot_at = 0.0
+
+    try:
+        while True:
+            if ser is None:
+                now = time.monotonic()
+                if now - last_snapshot_at >= args.snapshot_seconds:
+                    print_ports_snapshot(args.port, include_bluetooth=args.include_bluetooth)
+                    last_snapshot_at = now
+
+                ser, current_port, current_baud = open_serial(args, avoid_port=avoid_port)
+                if ser is None:
+                    time.sleep(args.retry_seconds)
+                    continue
+                avoid_port = None
+                last_uid_at = time.monotonic()
+
+            try:
+                raw = ser.readline()
+                if not raw:
+                    if not args.port and args.rotate_seconds > 0 and (time.monotonic() - last_uid_at) >= args.rotate_seconds:
+                        print(
+                            f"No UID on {current_port} @ {current_baud} for {args.rotate_seconds:.0f}s. Trying another port..."
+                        )
+                        avoid_port = current_port
+                        ser.close()
+                        ser = None
+                        current_port = None
+                        current_baud = None
+                    continue
+
+                line = raw.decode("utf-8", errors="ignore").strip()
+                if args.debug and line:
+                    print(f"RAW[{current_port}]: {line}")
+
+                uid = extract_uid(line)
+                if not uid:
+                    continue
+
+                last_uid_at = time.monotonic()
+                print(f"Read UID: {uid}")
+                pyautogui.write(uid)
+                pyautogui.press("enter")
+                print(f"Sent: {uid}")
+            except serial.SerialException as exc:
+                print(f"Serial connection lost on {current_port} @ {current_baud}: {exc}")
+                try:
+                    ser.close()
+                except Exception:
+                    pass
+                ser = None
+                current_port = None
+                current_baud = None
+                time.sleep(args.retry_seconds)
+    except KeyboardInterrupt:
+        print("\nExiting...")
+        if ser and ser.is_open:
+            ser.close()
+        sys.exit(0)
+
+
+if __name__ == "__main__":
+    main()
