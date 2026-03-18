@@ -67,10 +67,44 @@ Para iniciar servidor + frontend (modo ESP8266/RC522 por HTTP):
 composer run dev:win
 ```
 
-Si usas lector serial por COM (no ESP), usa:
+Si usas lector serial por COM/USB (no ESP), usa:
 
 ```powershell
 composer run dev:win:serial
+```
+
+Modo recomendado (compatible Pi USB y remoto USB):
+
+- Ejecutar el bridge en modo `api` para enviar UID por HTTP al backend.
+- Evita dependencia de foco/teclado y funciona en Linux headless (Pi) y Windows.
+
+Bridge USB en Raspberry Pi (lector conectado al Pi):
+
+```bash
+cd ~/Devices-Loans
+python3 -m venv .venv
+./.venv/bin/python -m pip install pyserial
+chmod +x scripts/start_nfc_bridge.sh
+RFID_BRIDGE_API_URL=http://127.0.0.1:8000/inventory/scan/esp \
+RFID_BRIDGE_SOURCE=pi-usb-1 \
+./scripts/start_nfc_bridge.sh
+```
+
+Bridge USB en Windows remoto (lector conectado al PC que abre la web):
+
+```powershell
+py -3 -m venv .venv
+.\.venv\Scripts\python.exe -m pip install pyserial
+$env:RFID_BRIDGE_API_URL = "http://10.204.248.185:8000/inventory/scan/esp"
+$env:RFID_BRIDGE_SOURCE = "remote-usb-1"
+powershell -NoProfile -ExecutionPolicy Bypass -File scripts/start_nfc_bridge.ps1
+```
+
+Opcional (modo legacy por teclado):
+
+```powershell
+.\.venv\Scripts\python.exe -m pip install pyautogui
+$env:RFID_BRIDGE_MODE = "keyboard"
 ```
 
 Endpoint para ESP8266 / ESP32:

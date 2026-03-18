@@ -1,9 +1,13 @@
-﻿import argparse
+import argparse
+import json
+import os
 import re
+import socket
 import sys
 import time
+from urllib import error as urllib_error
+from urllib import request as urllib_request
 
-import pyautogui
 import serial
 from serial.tools import list_ports
 
@@ -100,6 +104,59 @@ def extract_uid(line):
     return None
 
 
+def post_uid_http(uid, args):
+    payload = {
+        "uid": uid,
+        "source": args.source,
+    }
+    if args.token:
+        payload["token"] = args.token
+
+    body = json.dumps(payload).encode("utf-8")
+    req = urllib_request.Request(
+        args.api_url,
+        data=body,
+        headers={"Content-Type": "application/json"},
+        method="POST",
+    )
+
+    try:
+        with urllib_request.urlopen(req, timeout=args.http_timeout) as response:
+            raw = response.read().decode("utf-8", errors="ignore")
+            short = raw.strip().replace("\n", " ")
+            if len(short) > 220:
+                short = short[:220] + "..."
+            print(f"POST {response.status} -> {short}")
+            return True
+    except urllib_error.HTTPError as exc:
+        raw = exc.read().decode("utf-8", errors="ignore")
+        short = raw.strip().replace("\n", " ")
+        if len(short) > 220:
+            short = short[:220] + "..."
+        print(f"POST failed HTTP {exc.code}: {short}")
+    except Exception as exc:
+        print(f"POST failed: {exc}")
+
+    return False
+
+
+def send_uid_keyboard(uid):
+    try:
+        import pyautogui  # optional dependency used only in keyboard mode
+    except Exception as exc:
+        print(f"Keyboard mode requires pyautogui: {exc}")
+        return False
+
+    try:
+        pyautogui.write(uid)
+        pyautogui.press("enter")
+        print(f"Sent (keyboard): {uid}")
+        return True
+    except Exception as exc:
+        print(f"Keyboard send failed: {exc}")
+        return False
+
+
 def open_serial(args, avoid_port=None):
     if args.baud is not None:
         baud_targets = [args.baud]
@@ -131,7 +188,19 @@ def open_serial(args, avoid_port=None):
 
 
 def main():
+    default_mode = os.environ.get("RFID_BRIDGE_MODE", "api").strip().lower() or "api"
+    default_api_url = os.environ.get("RFID_BRIDGE_API_URL", "http://127.0.0.1:8000/inventory/scan/esp").strip()
+    default_source = os.environ.get("RFID_BRIDGE_SOURCE", f"usb-bridge-{socket.gethostname()}").strip()
+    default_token = os.environ.get("RFID_BRIDGE_TOKEN", os.environ.get("RFID_ESP_TOKEN", "")).strip()
+
     parser = argparse.ArgumentParser(description="NFC Serial Bridge")
+    parser.add_argument(
+        "--mode",
+        type=str,
+        choices=["api", "keyboard"],
+        default=default_mode,
+        help="Output mode: api (POST to backend) or keyboard (type + Enter)",
+    )
     parser.add_argument("--port", type=str, default=None, help="COM port (e.g., COM3). If omitted, auto-detects.")
     parser.add_argument("--baud", type=int, default=None, help="Fixed baud rate. If omitted, auto-tries common rates.")
     parser.add_argument(
@@ -155,6 +224,31 @@ def main():
     )
     parser.add_argument("--debug", action="store_true", help="Print raw serial lines")
     parser.add_argument(
+        "--api-url",
+        type=str,
+        default=default_api_url,
+        help="Backend endpoint for mode=api, e.g. http://IP:8000/inventory/scan/esp",
+    )
+    parser.add_argument(
+        "--source",
+        type=str,
+        default=default_source,
+        help="Reader source identifier sent to backend",
+    )
+    parser.add_argument(
+        "--token",
+        type=str,
+        default=default_token,
+        help="Optional token for backend RFID_ESP_TOKEN validation",
+    )
+    parser.add_argument("--http-timeout", type=float, default=4.0, help="HTTP timeout for mode=api")
+    parser.add_argument(
+        "--dedupe-seconds",
+        type=float,
+        default=1.0,
+        help="Ignore repeated same UID inside this time window",
+    )
+    parser.add_argument(
         "--include-bluetooth",
         action="store_true",
         help="Also try Bluetooth COM ports in automatic mode (disabled by default)",
@@ -162,6 +256,11 @@ def main():
     args = parser.parse_args()
 
     print("NFC bridge started. Press Ctrl+C to exit.")
+    print(f"Output mode: {args.mode}")
+    if args.mode == "api":
+        print(f"API URL: {args.api_url}")
+        print(f"Source: {args.source}")
+        print(f"Token: {'set' if args.token else 'empty'}")
     if args.port:
         print(f"Port mode: fixed ({args.port})")
     else:
@@ -178,6 +277,8 @@ def main():
     avoid_port = None
     last_uid_at = time.monotonic()
     last_snapshot_at = 0.0
+    last_sent_uid = None
+    last_sent_at = 0.0
 
     try:
         while True:
@@ -217,10 +318,19 @@ def main():
                     continue
 
                 last_uid_at = time.monotonic()
+                if uid == last_sent_uid and (last_uid_at - last_sent_at) < args.dedupe_seconds:
+                    print(f"Ignoring duplicate UID: {uid}")
+                    continue
+
                 print(f"Read UID: {uid}")
-                pyautogui.write(uid)
-                pyautogui.press("enter")
-                print(f"Sent: {uid}")
+                if args.mode == "api":
+                    sent_ok = post_uid_http(uid, args)
+                else:
+                    sent_ok = send_uid_keyboard(uid)
+
+                if sent_ok:
+                    last_sent_uid = uid
+                    last_sent_at = time.monotonic()
             except serial.SerialException as exc:
                 print(f"Serial connection lost on {current_port} @ {current_baud}: {exc}")
                 try:
