@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-APP_URL_VALUE="${APP_URL:-http://10.252.157.185:8000}"
+APP_URL_VALUE="${APP_URL:-http://10.204.248.185:8000}"
 
 if [ ! -f .env ]; then
   cp .env.example .env
@@ -18,7 +18,7 @@ touch database/database.sqlite
 
 APP_URL="$APP_URL_VALUE" php -r '
 $file = ".env";
-$appUrl = getenv("APP_URL") ?: "http://10.252.157.185:8000";
+$appUrl = getenv("APP_URL") ?: "http://10.204.248.185:8000";
 $updates = [
     "APP_URL" => $appUrl,
     "DB_CONNECTION" => "sqlite",

@@ -23,7 +23,7 @@ git remote -v
 
 IP LAN actual del Pi:
 
-- `10.252.157.185`
+- `10.204.248.185`
 
 Objetivo:
 
@@ -37,26 +37,26 @@ Flujo recomendado en el Raspberry Pi:
 git clone https://github.com/CamiloCM19/Devices-Loans.git
 cd Devices-Loans
 chmod +x scripts/deploy_pi.sh scripts/start_server_pi.sh
-APP_URL=http://10.252.157.185:8000 ./scripts/deploy_pi.sh
+APP_URL=http://10.204.248.185:8000 ./scripts/deploy_pi.sh
 APP_HOST=0.0.0.0 APP_PORT=8000 ./scripts/start_server_pi.sh
 ```
 
 Despues de eso, la interfaz debe abrir desde cualquier equipo en la misma red en:
 
 ```text
-http://10.252.157.185:8000
+http://10.204.248.185:8000
 ```
 
 Notas de conexion:
 
-- `APP_URL` en el Pi debe apuntar a `http://10.252.157.185:8000`
+- `APP_URL` en el Pi debe apuntar a `http://10.204.248.185:8000`
 - El servidor ya arranca escuchando en `0.0.0.0`, no solo en `localhost`
 - `scripts/deploy_pi.sh` fuerza SQLite local para que el Pi no dependa de MySQL
 - Para cambios nuevos desde GitHub en el Pi:
 
 ```bash
 git pull origin main
-APP_URL=http://10.252.157.185:8000 ./scripts/deploy_pi.sh
+APP_URL=http://10.204.248.185:8000 ./scripts/deploy_pi.sh
 ```
 
 ## Control de RFID (Windows)
@@ -73,24 +73,40 @@ Si usas lector serial por COM (no ESP), usa:
 composer run dev:win:serial
 ```
 
-Endpoint para ESP8266:
+Endpoint para ESP8266 / ESP32:
 
 - `POST /inventory/scan/esp`
 - body JSON o form-data con: `uid` (o `nfc_id`), `source` opcional, `token` opcional
 - prueba conectividad: `GET /inventory/scan/esp/ping`
-- sketch de prueba hardware/red: `scripts/esp8266_rc522_test.ino`
+- sketch de prueba hardware/red (ESP8266 + RC522): `scripts/esp8266_rc522_test.ino`
+- sketch de prueba hardware/red (ESP32 + PN532): `scripts/esp32_pn532_test.ino`
+
+PN532 + ESP32 (drivers/librerias):
+
+- Arduino IDE -> Board Manager: instala `esp32 by Espressif Systems`
+- Arduino IDE -> Library Manager: instala `Adafruit PN532`
+- Si el puerto COM no aparece en Windows, instala el driver USB segun tu placa ESP32:
+- CP210x (Silicon Labs) o CH340/CH341 (WCH)
+
+Arduino CLI (opcional):
+
+```bash
+arduino-cli core update-index
+arduino-cli core install esp32:esp32
+arduino-cli lib install "Adafruit PN532"
+```
 
 Importante de red:
 
 - Desde el ESP no uses `127.0.0.1` ni `localhost`.
 - Usa la IP LAN del Raspberry Pi.
-- IP actual del Pi: `10.252.157.185`
-- URL ejemplo: `http://10.252.157.185:8000/inventory/scan/esp`
+- IP actual del Pi: `10.204.248.185`
+- URL ejemplo: `http://10.204.248.185:8000/inventory/scan/esp`
 
 Ejemplo (desde ESP o prueba local):
 
 ```bash
-curl -X POST http://10.252.157.185:8000/inventory/scan/esp ^
+curl -X POST http://10.204.248.185:8000/inventory/scan/esp ^
   -H "Content-Type: application/json" ^
   -d "{\"uid\":\"04A1B2C3\",\"source\":\"esp-lab-1\",\"token\":\"TU_TOKEN\"}"
 ```
@@ -103,7 +119,7 @@ Si el endpoint responde con un tag no registrado, ahora devuelve:
 - `register_path`: ruta relativa usable aunque cambie el host/IP actual
 
 Notas:
-- En modo automático, el bridge ignora puertos Bluetooth (BTHENUM) por defecto.
+- En modo automatico, el bridge ignora puertos Bluetooth (BTHENUM) por defecto.
 - Si necesitas probar Bluetooth serial manualmente, usa `--include-bluetooth`.
 - Si tu lector funciona como teclado (keyboard wedge), no requiere puerto COM.
 
