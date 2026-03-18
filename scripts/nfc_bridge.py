@@ -14,6 +14,7 @@ from serial.tools import list_ports
 
 BLUETOOTH_HINTS = ("bluetooth", "bthenum")
 USB_HINTS = ("usb", "ch340", "cp210", "ftdi", "arduino", "uart", "serial")
+LOW_CONFIDENCE_DEVICE_HINTS = ("/dev/ttys", "/dev/ttyama", "/dev/ttyths", "/dev/ttyprintk")
 
 
 def is_bluetooth_port(port_info):
@@ -41,6 +42,8 @@ def list_candidate_ports(include_bluetooth=False):
             score += 10
         if is_bt:
             score -= 120
+        if any(device_hint in p.device.lower() for device_hint in LOW_CONFIDENCE_DEVICE_HINTS):
+            score -= 80
 
         ranked.append((score, p.device, p.description, p.hwid, is_bt))
 
@@ -167,7 +170,13 @@ def open_serial(args, avoid_port=None):
         targets = [args.port]
     else:
         ranked = list_candidate_ports(include_bluetooth=args.include_bluetooth)
-        targets = [d for _, d, _, _, _ in ranked]
+        if args.allow_low_score:
+            targets = [d for _, d, _, _, _ in ranked]
+        else:
+            targets = [d for score, d, _, _, _ in ranked if score > 0]
+            if not targets and ranked:
+                print("Only low-confidence ports detected. Waiting for USB-serial reader...")
+                print("Use --allow-low-score to force trying these ports.")
         if avoid_port and avoid_port in targets and len(targets) > 1:
             targets = [d for d in targets if d != avoid_port] + [avoid_port]
 
@@ -252,6 +261,11 @@ def main():
         "--include-bluetooth",
         action="store_true",
         help="Also try Bluetooth COM ports in automatic mode (disabled by default)",
+    )
+    parser.add_argument(
+        "--allow-low-score",
+        action="store_true",
+        help="Allow trying low-confidence ports (e.g. onboard ttyS/ttyAMA) in auto mode",
     )
     args = parser.parse_args()
 

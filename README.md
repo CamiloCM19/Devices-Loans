@@ -90,6 +90,12 @@ RFID_BRIDGE_SOURCE=pi-usb-1 \
 ./scripts/start_nfc_bridge.sh
 ```
 
+Si necesitas fijar puerto/baud (recomendado cuando hay varios seriales):
+
+```bash
+RFID_BRIDGE_PORT=/dev/ttyUSB0 RFID_BRIDGE_BAUD=115200 ./scripts/start_nfc_bridge.sh
+```
+
 Bridge USB en Windows remoto (lector conectado al PC que abre la web):
 
 ```powershell
@@ -98,6 +104,13 @@ py -3 -m venv .venv
 $env:RFID_BRIDGE_API_URL = "http://10.204.248.185:8000/inventory/scan/esp"
 $env:RFID_BRIDGE_SOURCE = "remote-usb-1"
 powershell -NoProfile -ExecutionPolicy Bypass -File scripts/start_nfc_bridge.ps1
+```
+
+Opcional en Windows:
+
+```powershell
+$env:RFID_BRIDGE_PORT = "COM5"
+$env:RFID_BRIDGE_BAUD = "115200"
 ```
 
 Opcional (modo legacy por teclado):
