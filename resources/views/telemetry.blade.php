@@ -63,7 +63,7 @@
                 <div class="flex items-center justify-between gap-3">
                     <div>
                         <p class="text-sm font-semibold text-slate-800">Eventos utiles recientes</p>
-                        <p class="text-xs text-slate-500">Solo backend y bridge; se excluye el ruido de UI del navegador.</p>
+                        <p class="text-xs text-slate-500">Solo backend y bridge; se excluyen eventos del navegador.</p>
                     </div>
                     <p id="telemetry_server_time" class="text-xs text-slate-500">Servidor: --</p>
                 </div>

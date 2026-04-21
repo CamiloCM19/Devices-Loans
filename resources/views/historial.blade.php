@@ -18,7 +18,7 @@
                     <p class="ui-kicker">Trazabilidad</p>
                     <h1 class="ui-title">Historial de Movimientos</h1>
                     <p class="ui-subtitle">
-                        Registro completo de prestamos y devoluciones con la misma interfaz clara del resto del sistema.
+                        Registro completo de prestamos y devoluciones para consultar cada movimiento.
                     </p>
                 </div>
                 <div class="ui-actions">

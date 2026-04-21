@@ -34,7 +34,7 @@
                     <p class="ui-kicker">Operacion diaria</p>
                     <h1 class="ui-title">Control de Camaras</h1>
                     <p class="ui-subtitle">
-                        Base visual clara y consistente para inventario, registro de tags, historial y telemetria.
+                        Gestiona inventario, registro de tags, historial y telemetria desde un solo lugar.
                     </p>
                 </div>
                 <div class="ui-actions">
@@ -124,7 +124,7 @@
             <div class="border-b border-[var(--ui-line)] px-6 py-5">
                 <p class="ui-kicker">Inventario</p>
                 <h2 class="ui-section-title">Estado actual de las camaras</h2>
-                <p class="ui-section-copy">Disponibilidad, mantenimiento y codigos NFC bajo una interfaz uniforme.</p>
+                <p class="ui-section-copy">Disponibilidad, mantenimiento y codigos NFC listos para consulta.</p>
             </div>
             <div class="ui-table-wrap">
             <table class="ui-data-table leading-normal">
