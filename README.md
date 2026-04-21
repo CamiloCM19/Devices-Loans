@@ -1,5 +1,32 @@
 laravel: http://127.0.0.1:8000
 
+## Instalar en un dispositivo nuevo
+
+En Raspberry Pi, Debian o Ubuntu, clona el repositorio y ejecuta:
+
+```bash
+bash scripts/install_new_device.sh
+```
+
+El script instala paquetes del sistema cuando hay `apt-get`, prepara `.env`,
+instala dependencias de Composer y npm, crea la base SQLite, ejecuta migraciones
+y compila assets. Tambien instala las dependencias del port Django por defecto.
+
+Variables utiles:
+
+```bash
+APP_PORT=8000 RFID_READER_DRIVER=mfrc522 bash scripts/install_new_device.sh
+INSTALL_DJANGO_PORT=0 bash scripts/install_new_device.sh
+RUN_TESTS=1 bash scripts/install_new_device.sh
+```
+
+Para correr despues de instalar:
+
+```bash
+APP_HOST=0.0.0.0 APP_PORT=8000 ./scripts/start_server_pi.sh
+RFID_READER_DRIVER=mfrc522 ./scripts/start_rfid_listener.sh
+```
+
 <p align="center"><a href="https://laravel.com" target="_blank"><img src="https://raw.githubusercontent.com/laravel/art/master/logo-lockup/5%20SVG/2%20CMYK/1%20Full%20Color/laravel-logolockup-cmyk-red.svg" width="400" alt="Laravel Logo"></a></p>
 
 <p align="center">

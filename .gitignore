@@ -21,6 +21,7 @@
 /storage/pail
 /vendor
 /django_port/db.sqlite3
+/django_port/.venv
 Homestead.json
 Homestead.yaml
 Thumbs.db
