@@ -13,14 +13,17 @@
 /.zed
 /auth.json
 /node_modules
+/.npm-cache
 /public/build
 /public/hot
 /public/storage
 /storage/*.key
 /storage/pail
 /vendor
+/django_port/db.sqlite3
 Homestead.json
 Homestead.yaml
 Thumbs.db
 __pycache__/
 *.pyc
+/Microsoft/Windows/PowerShell/ModuleAnalysisCache

@@ -50,13 +50,17 @@
         ],
         "dev:win:serial": [
             "Composer\\Config::disableProcessTimeout",
-            "npx concurrently -c \"#93c5fd,#c4b5fd,#fdba74,#34d399\" \"php artisan serve --host=0.0.0.0 --port=8000\" \"php artisan queue:listen --tries=1 --timeout=0\" \"npm run dev\" \"powershell -NoProfile -ExecutionPolicy Bypass -File scripts/start_nfc_bridge.ps1\" --names=server,queue,vite,rfid --kill-others"
+            "npx concurrently -c \"#93c5fd,#c4b5fd,#fdba74,#34d399\" \"php artisan serve --host=0.0.0.0 --port=8000\" \"php artisan queue:listen --tries=1 --timeout=0\" \"npm run dev\" \"powershell -NoProfile -ExecutionPolicy Bypass -File scripts/start_rfid_listener.ps1\" --names=server,queue,vite,rfid --kill-others"
         ],
-        "bridge:win": [
-            "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/start_nfc_bridge.ps1"
+        "dev:win:rfid": [
+            "Composer\\Config::disableProcessTimeout",
+            "npx concurrently -c \"#93c5fd,#c4b5fd,#fdba74,#34d399\" \"php artisan serve --host=0.0.0.0 --port=8000\" \"php artisan queue:listen --tries=1 --timeout=0\" \"npm run dev\" \"powershell -NoProfile -ExecutionPolicy Bypass -File scripts/start_rfid_listener.ps1\" --names=server,queue,vite,rfid --kill-others"
         ],
-        "bridge:pi": [
-            "bash scripts/start_nfc_bridge.sh"
+        "rfid:win": [
+            "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/start_rfid_listener.ps1"
+        ],
+        "rfid:pi": [
+            "bash scripts/start_rfid_listener.sh"
         ],
         "test": [
             "@php artisan config:clear --ansi",

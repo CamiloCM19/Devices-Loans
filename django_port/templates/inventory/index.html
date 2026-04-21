@@ -1,0 +1,119 @@
+{% extends "base.html" %}
+{% load static %}
+{% block title %}Inventario de Camaras{% endblock %}
+{% block body_class %}page-inventory{% endblock %}
+{% block content %}
+<main class="page">
+    <section class="hero">
+        <div>
+            <p class="eyebrow">Migracion Django</p>
+            <h1>Control de Camaras</h1>
+            <p class="hero-copy">Inventario, escaneo RFID y telemetria operativa sobre Django con HTML y TypeScript.</p>
+        </div>
+        <div class="hero-actions">
+            <a class="button button-secondary" href="{% url 'inventory:history' %}">Ver historial</a>
+        </div>
+    </section>
+
+    <section class="status-grid">
+        <article class="panel panel-accent">
+            <p class="panel-label">Sesion actual</p>
+            {% if estudiante_actual %}
+                <h2>{{ estudiante_actual.nombre }}</h2>
+                <p>Escanea una camara para registrar prestamo o devolucion.</p>
+            {% else %}
+                <h2>Esperando estudiante</h2>
+                <p>Escanea el carnet para comenzar el flujo.</p>
+            {% endif %}
+        </article>
+
+        <article class="panel">
+            <div class="panel-head">
+                <p class="panel-label">Estado del lector</p>
+                <span id="scanner_status_badge" class="badge badge-waiting">Esperando</span>
+            </div>
+            <p id="scanner_status_text">La pagina esta lista para recibir lecturas del lector RFID USB.</p>
+            <p id="scanner_last_scan" class="mono subtle">Ultima lectura: sin datos.</p>
+        </article>
+    </section>
+
+    <section
+        id="inventory-page-config"
+        class="telemetry-grid"
+        data-collect-url="{% url 'inventory:telemetry_collect' %}"
+        data-snapshot-url="{% url 'inventory:telemetry_snapshot' %}"
+        data-initial-reader-source="{{ latest_bridge_session.source|default:'sin detectar' }}"
+    >
+        <article class="panel panel-muted">
+            <div class="panel-head">
+                <p class="panel-label">Sesion web</p>
+                <span id="telemetry_session_id" class="mono">pendiente...</span>
+            </div>
+            <p id="telemetry_session_window">Sin inicializar.</p>
+        </article>
+        <article class="panel panel-muted">
+            <p class="panel-label">Ultimo evento backend/RFID</p>
+            <p id="telemetry_reader_status">Esperando telemetria del servidor.</p>
+            <p id="telemetry_reader_source" class="subtle">Fuente: {{ latest_bridge_session.source|default:'sin detectar' }}</p>
+        </article>
+        <article class="panel panel-muted">
+            <p class="panel-label">Bridge local</p>
+            <p id="telemetry_bridge_local_status">Sin archivo local aun.</p>
+        </article>
+        <article class="panel panel-muted">
+            <p class="panel-label">Estudiante activo</p>
+            <p id="telemetry_active_student">Ninguno.</p>
+        </article>
+        <article class="panel panel-muted telemetry-events">
+            <div class="panel-head">
+                <p class="panel-label">Eventos recientes</p>
+                <span id="telemetry_server_time" class="subtle">Servidor: --</span>
+            </div>
+            <ul id="telemetry_recent_events" class="event-list">
+                <li class="event-row event-row-empty">Esperando eventos recientes...</li>
+            </ul>
+        </article>
+    </section>
+
+    <section class="panel inventory-table">
+        <div class="panel-head">
+            <div>
+                <p class="panel-label">Inventario</p>
+                <h2>Estado actual de las camaras</h2>
+            </div>
+        </div>
+        <div class="table-wrap">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Modelo</th>
+                        <th>Estado</th>
+                        <th>ID NFC</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for camara in camaras %}
+                        <tr>
+                            <td>{{ camara.display_model }}</td>
+                            <td><span class="badge badge-{{ camara.estado|lower }}">{{ camara.estado }}</span></td>
+                            <td class="mono">{{ camara.nfc_id|default:"Sin asignar" }}</td>
+                        </tr>
+                    {% empty %}
+                        <tr>
+                            <td colspan="3">No hay camaras registradas.</td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </section>
+</main>
+
+<form action="{% url 'inventory:scan' %}" method="post" id="nfc_form">
+    {% csrf_token %}
+    <input type="hidden" name="telemetry_session_uuid" id="telemetry_session_uuid">
+    <input type="text" name="nfc_id" id="nfc_input" autocomplete="off" autofocus class="scanner-input">
+</form>
+
+<script type="module" src="{% static 'inventory/inventoryPage.js' %}"></script>
+{% endblock %}

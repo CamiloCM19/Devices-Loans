@@ -1,0 +1,102 @@
+{% extends "base.html" %}
+{% load static %}
+{% block title %}Registrar Tag{% endblock %}
+{% block body_class %}page-register{% endblock %}
+{% block content %}
+<main class="page">
+    <section class="hero">
+        <div>
+            <p class="eyebrow">Registro dinamico</p>
+            <h1>Nuevo Tag Detectado</h1>
+            <p class="hero-copy">Este codigo no esta registrado. Puedes asignarlo a un estudiante o a una camara.</p>
+        </div>
+        <div class="tag-chip mono">{{ nfc_id }}</div>
+    </section>
+
+    <section
+        id="register-page-config"
+        class="status-grid"
+        data-collect-url="{% url 'inventory:telemetry_collect' %}"
+        data-snapshot-url="{% url 'inventory:telemetry_snapshot' %}"
+        data-current-nfc-id="{{ nfc_id }}"
+    >
+        <article class="panel">
+            <div class="panel-head">
+                <p class="panel-label">Estado del lector</p>
+                <span id="scanner_status_badge" class="badge badge-waiting">Esperando</span>
+            </div>
+            <p id="scanner_status_text">Si acercas otro tag, esta pagina lo detectara y reenviara el flujo.</p>
+            <p id="scanner_last_scan" class="mono subtle">Ultima lectura: sin datos.</p>
+            <p id="telemetry_register_session" class="mono subtle">Sesion telemetrica: pendiente...</p>
+        </article>
+    </section>
+
+    <section class="card-grid">
+        <article class="panel">
+            <p class="panel-label">Registrar estudiante</p>
+            <h2>Asignar tag a estudiante</h2>
+            <form action="{% url 'inventory:store_student' %}" method="post" class="stack-form">
+                {% csrf_token %}
+                {{ student_form.nfc_id }}
+                <label>
+                    <span>{{ student_form.estudiante.label }}</span>
+                    {{ student_form.estudiante }}
+                    {% for error in student_form.estudiante.errors %}
+                        <small class="form-error">{{ error }}</small>
+                    {% endfor %}
+                </label>
+                <label>
+                    <span>{{ student_form.alias.label }}</span>
+                    {{ student_form.alias }}
+                    {% for error in student_form.alias.errors %}
+                        <small class="form-error">{{ error }}</small>
+                    {% endfor %}
+                </label>
+                {% for error in student_form.nfc_id.errors %}
+                    <small class="form-error">{{ error }}</small>
+                {% endfor %}
+                <button class="button" type="submit">Guardar estudiante</button>
+            </form>
+        </article>
+
+        <article class="panel">
+            <p class="panel-label">Registrar camara</p>
+            <h2>Asignar tag a camara</h2>
+            <form action="{% url 'inventory:store_camera' %}" method="post" class="stack-form">
+                {% csrf_token %}
+                {{ camera_form.nfc_id }}
+                <label>
+                    <span>{{ camera_form.camara.label }}</span>
+                    {{ camera_form.camara }}
+                    {% for error in camera_form.camara.errors %}
+                        <small class="form-error">{{ error }}</small>
+                    {% endfor %}
+                </label>
+                <label>
+                    <span>{{ camera_form.alias.label }}</span>
+                    {{ camera_form.alias }}
+                    {% for error in camera_form.alias.errors %}
+                        <small class="form-error">{{ error }}</small>
+                    {% endfor %}
+                </label>
+                {% for error in camera_form.nfc_id.errors %}
+                    <small class="form-error">{{ error }}</small>
+                {% endfor %}
+                <button class="button button-secondary" type="submit">Guardar camara</button>
+            </form>
+        </article>
+    </section>
+
+    <div class="page-foot">
+        <a href="{% url 'inventory:index' %}">Cancelar y volver al inventario</a>
+    </div>
+</main>
+
+<form action="{% url 'inventory:scan' %}" method="post" id="nfc_form">
+    {% csrf_token %}
+    <input type="hidden" name="telemetry_session_uuid" id="telemetry_session_uuid">
+    <input type="text" name="nfc_id" id="nfc_input" autocomplete="off" class="scanner-input">
+</form>
+
+<script type="module" src="{% static 'inventory/registerPage.js' %}"></script>
+{% endblock %}

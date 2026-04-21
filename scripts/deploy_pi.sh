@@ -2,6 +2,7 @@
 set -euo pipefail
 
 APP_URL_VALUE="${APP_URL:-http://10.204.248.185:8000}"
+RFID_READER_DRIVER_VALUE="${RFID_READER_DRIVER:-auto}"
 
 if [ ! -f .env ]; then
   cp .env.example .env
@@ -26,6 +27,7 @@ $updates = [
     "SESSION_DRIVER" => "database",
     "CACHE_STORE" => "database",
     "QUEUE_CONNECTION" => "database",
+    "RFID_READER_DRIVER" => getenv("RFID_READER_DRIVER") ?: "auto",
 ];
 $content = file_get_contents($file);
 if ($content === false) {
@@ -57,4 +59,6 @@ php artisan route:clear
 php artisan view:clear
 
 echo "Deployment ready for ${APP_URL_VALUE}"
+echo "Configured reader profile: ${RFID_READER_DRIVER_VALUE}"
 echo "Start the server with: APP_HOST=0.0.0.0 APP_PORT=8000 ./scripts/start_server_pi.sh"
+echo "Start the NFC/RFID listener with: RFID_READER_DRIVER=${RFID_READER_DRIVER_VALUE} ./scripts/start_rfid_listener.sh"

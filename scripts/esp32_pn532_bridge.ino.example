@@ -7,28 +7,20 @@
 const char* WIFI_SSID = "TU_WIFI";
 const char* WIFI_PASS = "TU_PASS";
 
-// Use the Raspberry Pi LAN IP, never localhost/127.0.0.1
-const char* API_URL = "http://10.204.248.185:8000/inventory/scan/esp";
-const char* API_TOKEN = "";  // optional: same as RFID_ESP_TOKEN in .env
+// Usa la IP LAN del servidor Laravel, nunca localhost/127.0.0.1
+const char* API_URL = "http://10.204.248.185:8000/inventory/scan/rfid";
+const char* API_TOKEN = "";  // opcional: mismo valor que RFID_READER_TOKEN en .env
 const char* SOURCE_ID = "esp32-pn532-1";
 
 // ---------- PN532 (I2C mode) ----------
-// ESP32 default I2C pins:
-// SDA -> GPIO21
-// SCL -> GPIO22
-// Put PN532 switch/selectors in I2C mode before powering on.
 static const int I2C_SDA_PIN = 21;
 static const int I2C_SCL_PIN = 22;
-
-// Typical pins used by Adafruit_PN532 in I2C mode.
-// If your board does not expose these pins, keep them disconnected and use:
-// Adafruit_PN532 nfc(&Wire); (depends on library version).
 static const int PN532_IRQ_PIN = 4;
 static const int PN532_RESET_PIN = 5;
 Adafruit_PN532 nfc(PN532_IRQ_PIN, PN532_RESET_PIN);
 
 // ---------- Tuning ----------
-static const uint32_t UID_COOLDOWN_MS = 1500;   // avoid duplicate reads flood
+static const uint32_t UID_COOLDOWN_MS = 1500;
 static const uint32_t WIFI_RETRY_MS = 4000;
 
 String lastUid = "";
@@ -89,7 +81,7 @@ void postUid(const String& uid) {
   }
   http.addHeader("Content-Type", "application/json");
 
-  String body = "{\"uid\":\"" + uid + "\",\"source\":\"" + SOURCE_ID + "\"";
+  String body = "{\"uid\":\"" + uid + "\",\"source\":\"" + SOURCE_ID + "\",\"reader_model\":\"pn532\",\"bridge_transport\":\"wifi-http\",\"bridge_mode\":\"api\"";
   if (strlen(API_TOKEN) > 0) {
     body += ",\"token\":\"";
     body += API_TOKEN;
@@ -111,7 +103,7 @@ void setup() {
   Serial.begin(115200);
   delay(200);
   Serial.println();
-  Serial.println("ESP32 + PN532 test start");
+  Serial.println("ESP32 + PN532 bridge start");
 
   Wire.begin(I2C_SDA_PIN, I2C_SCL_PIN);
   nfc.begin();

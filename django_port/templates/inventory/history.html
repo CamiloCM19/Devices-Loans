@@ -1,0 +1,46 @@
+{% extends "base.html" %}
+{% block title %}Historial{% endblock %}
+{% block body_class %}page-history{% endblock %}
+{% block content %}
+<main class="page">
+    <section class="hero">
+        <div>
+            <p class="eyebrow">Trazabilidad</p>
+            <h1>Historial de Movimientos</h1>
+            <p class="hero-copy">Registro completo de prestamos y devoluciones en la nueva migracion Django.</p>
+        </div>
+        <div class="hero-actions">
+            <a class="button button-secondary" href="{% url 'inventory:index' %}">Volver al inventario</a>
+        </div>
+    </section>
+
+    <section class="panel inventory-table">
+        <div class="table-wrap">
+            <table>
+                <thead>
+                    <tr>
+                        <th>Estudiante</th>
+                        <th>Camara</th>
+                        <th>Accion</th>
+                        <th>Fecha</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for log in logs %}
+                        <tr>
+                            <td>{{ log.estudiante.nombre }}</td>
+                            <td>{{ log.camara.display_model }}</td>
+                            <td><span class="badge badge-{{ log.accion|lower }}">{{ log.accion }}</span></td>
+                            <td>{{ log.created_at|date:"d/m/Y H:i" }}</td>
+                        </tr>
+                    {% empty %}
+                        <tr>
+                            <td colspan="4">No hay registros de movimientos aun.</td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </section>
+</main>
+{% endblock %}

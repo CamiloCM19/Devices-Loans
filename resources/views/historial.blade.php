@@ -4,57 +4,55 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Historial de Préstamos - Control de Cámaras</title>
+    <title>Historial de Prestamos - Control de Camaras</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-    <style>
-        body {
-            font-family: 'Inter', sans-serif;
-        }
-    </style>
+    @include('partials.unified-ui-head')
 </head>
 
-<body class="bg-gray-50 text-gray-800 min-h-screen">
+<body class="ui-body">
 
-    <div class="container mx-auto px-4 py-8">
-
-        <!-- Header -->
-        <div class="flex justify-between items-center mb-10">
-            <div>
-                <h1 class="text-4xl font-extrabold text-gray-900 tracking-tight">Historial de Movimientos</h1>
-                <p class="text-gray-500 mt-2 text-lg">Registro completo de préstamos y devoluciones</p>
+    <div class="ui-shell">
+        <div class="ui-header-card mb-8">
+            <div class="flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
+                <div>
+                    <p class="ui-kicker">Trazabilidad</p>
+                    <h1 class="ui-title">Historial de Movimientos</h1>
+                    <p class="ui-subtitle">
+                        Registro completo de prestamos y devoluciones con la misma interfaz clara del resto del sistema.
+                    </p>
+                </div>
+                <div class="ui-actions">
+                    <a href="{{ route('inventory.index') }}" class="ui-button ui-button--secondary">
+                        Volver al inventario
+                    </a>
+                </div>
             </div>
-            <a href="{{ route('inventory.index') }}"
-                class="bg-white border border-gray-300 text-gray-700 hover:bg-gray-50 hover:text-gray-900 font-medium py-2 px-6 rounded-lg shadow-sm transition duration-300 flex items-center gap-2">
-                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-                    <path fill-rule="evenodd"
-                        d="M9.707 16.707a1 1 0 01-1.414 0l-6-6a1 1 0 010-1.414l6-6a1 1 0 011.414 1.414L5.414 9H17a1 1 0 110 2H5.414l4.293 4.293a1 1 0 010 1.414z"
-                        clip-rule="evenodd" />
-                </svg>
-                Volver al Inventario
-            </a>
         </div>
 
-        <!-- Table Container -->
-        <div class="bg-white rounded-xl shadow-xl overflow-hidden border border-gray-100">
-            <div class="overflow-x-auto">
-                <table class="w-full text-left border-collapse">
+        <div class="ui-table-card">
+            <div class="border-b border-[var(--ui-line)] px-6 py-5">
+                <p class="ui-kicker">Historial</p>
+                <h2 class="ui-section-title">Movimientos registrados</h2>
+                <p class="ui-section-copy">Consulta quien retiro o devolvio cada camara y en que momento ocurrio.</p>
+            </div>
+
+            <div class="ui-table-wrap">
+                <table class="ui-data-table">
                     <thead>
-                        <tr
-                            class="bg-gray-50 border-b border-gray-200 text-xs uppercase text-gray-500 font-semibold tracking-wider">
-                            <th class="px-6 py-4">Estudiante</th>
-                            <th class="px-6 py-4">Cámara</th>
-                            <th class="px-6 py-4 text-center">Acción</th>
-                            <th class="px-6 py-4">Fecha y Hora</th>
+                        <tr>
+                            <th>Estudiante</th>
+                            <th>Camara</th>
+                            <th class="text-center">Accion</th>
+                            <th>Fecha y hora</th>
                         </tr>
                     </thead>
-                    <tbody class="divide-y divide-gray-100">
+                    <tbody>
                         @forelse($logs as $log)
-                            <tr class="hover:bg-gray-50/50 transition duration-150">
-                                <td class="px-6 py-4 whitespace-nowrap">
+                            <tr>
+                                <td class="whitespace-nowrap">
                                     <div class="flex items-center">
                                         <div
-                                            class="h-10 w-10 flex-shrink-0 bg-blue-100 text-blue-600 rounded-full flex items-center justify-center font-bold text-sm">
+                                            class="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full bg-blue-100 text-sm font-bold text-blue-600">
                                             {{ substr($log->estudiante->nombre ?? '?', 0, 1) }}
                                         </div>
                                         <div class="ml-4">
@@ -65,53 +63,53 @@
                                         </div>
                                     </div>
                                 </td>
-                                <td class="px-6 py-4 whitespace-nowrap">
-                                    <div class="text-sm text-gray-900 font-medium">
-                                        {{ str_replace('Canon T7', 'Cámara', $log->camara->modelo ?? 'Desconocido') }}</div>
-                                    <div class="text-xs text-gray-500 font-mono">{{ $log->camara_id }}</div>
+                                <td class="whitespace-nowrap">
+                                    <div class="text-sm font-medium text-gray-900">
+                                        {{ str_replace('Canon T7', 'Camara', $log->camara->modelo ?? 'Desconocido') }}
+                                    </div>
+                                    <div class="text-xs font-mono text-gray-500">{{ $log->camara_id }}</div>
                                 </td>
-                                <td class="px-6 py-4 whitespace-nowrap text-center">
+                                <td class="whitespace-nowrap text-center">
                                     @if($log->accion === 'Prestamo')
                                         <span
-                                            class="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-red-100 text-red-800 border border-red-200">
-                                            <svg class="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"
+                                            class="inline-flex items-center rounded-full border border-red-200 bg-red-100 px-3 py-1 text-xs font-medium text-red-800">
+                                            <svg class="mr-1 h-3 w-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"
                                                 xmlns="http://www.w3.org/2000/svg">
                                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                                                     d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1">
                                                 </path>
                                             </svg>
-                                            Préstamo
+                                            Prestamo
                                         </span>
                                     @else
                                         <span
-                                            class="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800 border border-green-200">
-                                            <svg class="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"
+                                            class="inline-flex items-center rounded-full border border-green-200 bg-green-100 px-3 py-1 text-xs font-medium text-green-800">
+                                            <svg class="mr-1 h-3 w-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"
                                                 xmlns="http://www.w3.org/2000/svg">
                                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                                                     d="M11 16l-4-4m0 0l4-4m-4 4h14m-5 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h7a3 3 0 013 3v1">
                                                 </path>
                                             </svg>
-                                            Devolución
+                                            Devolucion
                                         </span>
                                     @endif
                                 </td>
-                                <td class="px-6 py-4 whitespace-nowrap">
-                                    <div class="text-sm text-gray-900 font-semibold">{{ $log->created_at->format('d/m/Y') }}
-                                    </div>
+                                <td class="whitespace-nowrap">
+                                    <div class="text-sm font-semibold text-gray-900">{{ $log->created_at->format('d/m/Y') }}</div>
                                     <div class="text-xs text-gray-500">{{ $log->created_at->format('h:i A') }}</div>
                                 </td>
                             </tr>
                         @empty
                             <tr>
-                                <td colspan="4" class="px-6 py-10 text-center text-gray-500">
+                                <td colspan="4" class="py-10 text-center text-gray-500">
                                     <div class="flex flex-col items-center justify-center">
-                                        <svg class="w-12 h-12 text-gray-300 mb-3" fill="none" stroke="currentColor"
+                                        <svg class="mb-3 h-12 w-12 text-gray-300" fill="none" stroke="currentColor"
                                             viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
                                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                                                 d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01">
                                             </path>
                                         </svg>
-                                        <p class="text-lg font-medium">No hay registros de movimientos aún.</p>
+                                        <p class="text-lg font-medium">No hay registros de movimientos aun.</p>
                                     </div>
                                 </td>
                             </tr>
@@ -119,13 +117,7 @@
                     </tbody>
                 </table>
             </div>
-
-            <!-- Pagination if needed, though not requested yet -->
-            {{-- <div class="px-6 py-4 bg-gray-50 border-t border-gray-200">
-                {{ $logs->links() }}
-            </div> --}}
         </div>
-
     </div>
 
 </body>
