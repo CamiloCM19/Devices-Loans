@@ -275,6 +275,66 @@ class InventoryRegistrationTest extends TestCase
         $this->assertSame('bridge', $event->session_type);
     }
 
+    public function test_snapshot_exposes_remote_rfid_events_for_ui_refresh()
+    {
+        $response = $this->postJson(route('inventory.scan.rfid'), [
+            'uid' => 'RFID_REMOTE_UI_404',
+            'source' => 'usb-remoto-aula',
+            'reader_model' => 'mfrc522',
+            'bridge_session_uuid' => 'bridge-remote-ui-001',
+            'bridge_transport' => 'serial',
+            'bridge_mode' => 'remote-http',
+            'bridge_host' => 'PC-REMOTO-01',
+            'bridge_pid' => 3210,
+        ]);
+
+        $response->assertStatus(404);
+
+        $snapshot = $this->getJson(route('inventory.telemetry.snapshot', [
+            'session_uuid' => 'web-session-check-ui',
+            'limit' => 12,
+        ]));
+
+        $snapshot->assertOk()
+            ->assertJsonPath('latest_reader_event.event_type', 'backend.rfid_scan.unregistered')
+            ->assertJsonPath('latest_reader_event.source', 'usb-remoto-aula')
+            ->assertJsonPath('active_bridge_sessions.0.source', 'usb-remoto-aula')
+            ->assertJsonPath('active_bridge_sessions.0.reader_model', 'mfrc522')
+            ->assertJsonPath('latest_reader_event.payload.register_path', '/inventory/register/RFID_REMOTE_UI_404');
+    }
+
+    public function test_snapshot_uses_recent_remote_events_when_local_bridge_log_is_missing()
+    {
+        $this->postJson(route('inventory.scan.rfid'), [
+            'uid' => 'RFID_REMOTE_TIMELINE_404',
+            'source' => 'usb-remoto-linea',
+            'reader_model' => 'mfrc522',
+            'bridge_session_uuid' => 'bridge-remote-timeline-001',
+            'bridge_transport' => 'serial',
+            'bridge_mode' => 'remote-http',
+            'bridge_host' => 'PC-REMOTO-02',
+            'bridge_pid' => 9876,
+        ])->assertStatus(404);
+
+        $snapshot = $this->getJson(route('inventory.telemetry.snapshot', [
+            'limit' => 12,
+        ]));
+
+        $snapshot->assertOk();
+        $bridgeEvents = $snapshot->json('bridge_log_events');
+
+        $this->assertNotEmpty($bridgeEvents);
+        $matchingRemoteEvent = collect($bridgeEvents)->first(function (array $event) {
+            return ($event['source'] ?? null) === 'usb-remoto-linea'
+                && in_array($event['event_type'] ?? null, [
+                    'backend.rfid_scan.received',
+                    'backend.rfid_scan.unregistered',
+                ], true);
+        });
+
+        $this->assertNotNull($matchingRemoteEvent);
+    }
+
     public function test_auto_shutdown_watchdog_does_not_shutdown_when_recent_activity_exists()
     {
         Process::fake();

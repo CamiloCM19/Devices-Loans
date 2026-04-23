@@ -16,4 +16,14 @@ class ExampleTest extends TestCase
 
         $response->assertRedirect(route('inventory.index'));
     }
+
+    public function test_workflow_guide_is_accessible(): void
+    {
+        $response = $this->get(route('inventory.workflow'));
+
+        $response->assertStatus(200);
+        $response->assertSee('Guia de uso');
+        $response->assertSee('Orden recomendado de escaneo');
+        $response->assertSee('Como se enlaza un tag');
+    }
 }

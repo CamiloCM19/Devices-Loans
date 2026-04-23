@@ -75,8 +75,8 @@
             </section>
 
             <section class="ui-card">
-                <p class="text-sm font-semibold text-slate-800">Estado del bridge local</p>
-                <p class="mt-1 text-xs text-slate-500">Ultimas lineas del archivo local del listener serial.</p>
+                <p class="text-sm font-semibold text-slate-800">Estado del bridge</p>
+                <p class="mt-1 text-xs text-slate-500">Archivo local del servidor o, si no existe, actividad remota reciente del lector.</p>
                 <ul id="telemetry_bridge_events" class="ui-log-list">
                     <li class="ui-log-item ui-log-item--empty">
                         Sin archivo local aun.

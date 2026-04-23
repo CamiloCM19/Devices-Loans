@@ -38,6 +38,9 @@
                     </p>
                 </div>
                 <div class="ui-actions">
+                    <a href="{{ route('inventory.workflow') }}" class="ui-button ui-button--secondary">
+                        Guia de uso
+                    </a>
                     <a href="{{ route('inventory.telemetry.index') }}" class="ui-button ui-button--secondary">
                         Telemetria
                     </a>

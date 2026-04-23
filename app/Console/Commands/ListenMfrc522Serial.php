@@ -6,6 +6,7 @@ use App\Services\RfidScanProcessor;
 use App\Support\HardwareTelemetryRecorder;
 use App\Support\RfidSerialSupport;
 use Illuminate\Console\Command;
+use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Str;
 
 class ListenMfrc522Serial extends Command
@@ -15,6 +16,9 @@ class ListenMfrc522Serial extends Command
         {--baud= : Baud rate del lector NFC/RFID}
         {--reader= : Perfil del lector NFC (auto|mfrc522|pn532)}
         {--source= : Nombre del origen que se vera en telemetria}
+        {--target-url= : URL del servidor central. Acepta base app o endpoint /inventory/scan/rfid}
+        {--token= : Token opcional para el servidor central}
+        {--http-timeout=8 : Timeout del bridge remoto por HTTP, en segundos}
         {--dedupe-ms=1200 : Ignora lecturas repetidas dentro de esta ventana}
         {--frame-idle-ms=150 : Cierra una trama serial corta si no llegan mas bytes}
         {--reconnect-delay=2 : Segundos de espera antes de reintentar}
@@ -53,6 +57,18 @@ class ListenMfrc522Serial extends Command
 
     private string $deviceSelectionMode = 'manual';
 
+    private string $bridgeMode = 'direct';
+
+    private string $bridgeHost = '';
+
+    private int $bridgePid = 0;
+
+    private ?string $remoteTargetUrl = null;
+
+    private string $remoteToken = '';
+
+    private int $remoteHttpTimeout = 8;
+
     public function __construct(
         private readonly RfidScanProcessor $processor,
         private readonly HardwareTelemetryRecorder $telemetry,
@@ -65,6 +81,12 @@ class ListenMfrc522Serial extends Command
         $this->sessionUuid = (string) Str::uuid();
         $this->readerProfile = $this->resolveReaderProfile();
         $this->source = $this->resolveSource();
+        $this->bridgeHost = gethostname() ?: php_uname('n');
+        $this->bridgePid = (int) (getmypid() ?: 0);
+        $this->remoteTargetUrl = $this->resolveRemoteTargetUrl();
+        $this->remoteToken = $this->resolveRemoteToken();
+        $this->remoteHttpTimeout = $this->resolveRemoteHttpTimeout();
+        $this->bridgeMode = $this->remoteTargetUrl ? 'remote-http' : 'direct';
         $this->registerSignalHandlers();
 
         $device = $this->resolveDevice();
@@ -81,15 +103,20 @@ class ListenMfrc522Serial extends Command
                 'reader_model' => $this->readerProfile,
                 'device_selection' => $this->deviceSelectionMode,
                 'bridge_transport' => 'serial',
-                'bridge_mode' => 'direct',
-                'bridge_host' => gethostname() ?: php_uname('n'),
-                'bridge_pid' => getmypid(),
+                'bridge_mode' => $this->bridgeMode,
+                'bridge_host' => $this->bridgeHost,
+                'bridge_pid' => $this->bridgePid,
+                'bridge_target_url' => $this->remoteTargetUrl,
             ]
         );
 
         $this->components->info("Escuchando {$readerLabel} en {$device} a {$baud} baudios.");
         $this->line("Fuente: {$this->source}");
         $this->line("Perfil lector: {$this->readerProfile}");
+        $this->line("Modo bridge: {$this->bridgeMode}");
+        if ($this->remoteTargetUrl) {
+            $this->line("Servidor central: {$this->remoteTargetUrl}");
+        }
         $this->line("Sesion: {$this->sessionUuid}");
 
         while (true) {
@@ -155,6 +182,29 @@ class ListenMfrc522Serial extends Command
             'mfrc522', 'pn532' => $reader,
             default => 'auto',
         };
+    }
+
+    private function resolveRemoteTargetUrl(): ?string
+    {
+        return RfidSerialSupport::normalizeRemoteApiUrl(
+            $this->option('target-url') ?: env('RFID_REMOTE_API_URL', '')
+        );
+    }
+
+    private function resolveRemoteToken(): string
+    {
+        return trim((string) (
+            $this->option('token')
+            ?: env('RFID_REMOTE_API_TOKEN', env('RFID_READER_TOKEN', ''))
+        ));
+    }
+
+    private function resolveRemoteHttpTimeout(): int
+    {
+        return max(3, (int) (
+            $this->option('http-timeout')
+            ?: env('RFID_REMOTE_API_TIMEOUT', 8)
+        ));
     }
 
     private function resolveSource(): string
@@ -535,21 +585,88 @@ PS;
             ]
         );
 
-        $result = $this->processor->process($uid, [
-            'source' => $this->source,
-            'reader_model' => $this->readerProfile,
-            'bridge_session_uuid' => $this->sessionUuid,
-            'bridge_transport' => 'serial',
-            'bridge_mode' => 'direct',
-            'bridge_host' => gethostname() ?: php_uname('n'),
-            'bridge_pid' => getmypid(),
-            'ip' => 'cli',
-        ]);
+        $result = $this->remoteTargetUrl
+            ? $this->forwardUidToRemoteServer($uid, $rawLine)
+            : $this->processor->process($uid, $this->buildBridgeContext());
 
         $status = (string) ($result['body']['status'] ?? 'unknown');
         $message = (string) ($result['body']['message'] ?? '');
         $this->line("[{$status}] {$uid} {$message}");
     }
+
+    /**
+     * @return array{body: array<string, mixed>, status_code: int}
+     */
+    private function forwardUidToRemoteServer(string $uid, string $rawLine): array
+    {
+        $payload = array_merge($this->buildBridgeContext(), [
+            'uid' => $uid,
+        ]);
+
+        if ($this->remoteToken !== '') {
+            $payload['token'] = $this->remoteToken;
+        }
+
+        try {
+            $response = Http::acceptJson()
+                ->asJson()
+                ->connectTimeout(min(5, $this->remoteHttpTimeout))
+                ->timeout($this->remoteHttpTimeout)
+                ->post($this->remoteTargetUrl, $payload);
+        } catch (\Throwable $exception) {
+            $this->recordBridgeEvent(
+                'bridge.remote_delivery_failed',
+                'No se pudo enviar la lectura al servidor central.',
+                [
+                    'uid' => $uid,
+                    'uid_raw' => $rawLine,
+                    'remote_url' => $this->remoteTargetUrl,
+                    'exception' => $exception->getMessage(),
+                ],
+                'error'
+            );
+
+            return [
+                'body' => [
+                    'ok' => false,
+                    'status' => 'remote_unreachable',
+                    'message' => 'No se pudo contactar al servidor central.',
+                ],
+                'status_code' => 0,
+            ];
+        }
+
+        $body = $response->json();
+        if (!is_array($body)) {
+            $body = [
+                'ok' => $response->successful(),
+                'status' => $response->successful() ? 'ok' : 'remote_http_error',
+                'message' => trim((string) $response->body()),
+            ];
+        }
+
+        if (!$response->successful()) {
+            $this->recordBridgeEvent(
+                'bridge.remote_delivery_failed',
+                'El servidor central rechazo o no pudo procesar la lectura RFID remota.',
+                [
+                    'uid' => $uid,
+                    'uid_raw' => $rawLine,
+                    'remote_url' => $this->remoteTargetUrl,
+                    'http_status' => $response->status(),
+                    'remote_status' => $body['status'] ?? null,
+                    'remote_message' => $body['message'] ?? null,
+                ],
+                'warning'
+            );
+        }
+
+        return [
+            'body' => $body,
+            'status_code' => $response->status(),
+        ];
+    }
+
     private function looksPrintable(string $line): bool
     {
         return preg_match('/^[\x20-\x7E]+$/', $line) === 1;
@@ -609,9 +726,10 @@ PS;
     ): void {
         $metadata = [
             'bridge_transport' => 'serial',
-            'bridge_mode' => 'direct',
-            'bridge_host' => gethostname() ?: php_uname('n'),
-            'bridge_pid' => getmypid(),
+            'bridge_mode' => $this->bridgeMode,
+            'bridge_host' => $this->bridgeHost,
+            'bridge_pid' => $this->bridgePid,
+            'bridge_target_url' => $this->remoteTargetUrl,
             'reader_model' => $this->readerProfile,
         ];
 
@@ -652,5 +770,22 @@ PS;
         }
 
         file_put_contents($path, json_encode($event, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) . PHP_EOL, FILE_APPEND);
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function buildBridgeContext(): array
+    {
+        return [
+            'source' => $this->source,
+            'reader_model' => $this->readerProfile,
+            'bridge_session_uuid' => $this->sessionUuid,
+            'bridge_transport' => 'serial',
+            'bridge_mode' => $this->bridgeMode,
+            'bridge_host' => $this->bridgeHost,
+            'bridge_pid' => $this->bridgePid,
+            'ip' => 'cli',
+        ];
     }
 }

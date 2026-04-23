@@ -20,10 +20,45 @@ $lanUrl = $null
 $lanInventoryUrl = $null
 $sharedInventoryUrl = $null
 
+function Get-BestLanIPv4 {
+    try {
+        $route = Get-NetRoute -AddressFamily IPv4 -DestinationPrefix "0.0.0.0/0" |
+            Sort-Object RouteMetric, InterfaceMetric |
+            Select-Object -First 1
+
+        if ($route) {
+            $address = Get-NetIPAddress -AddressFamily IPv4 -InterfaceIndex $route.InterfaceIndex |
+                Where-Object {
+                    $_.IPAddress -notlike "127.*" -and
+                    $_.IPAddress -notlike "169.254.*" -and
+                    $_.PrefixOrigin -ne "WellKnown" -and
+                    $_.AddressState -eq "Preferred"
+                } |
+                Select-Object -First 1 -ExpandProperty IPAddress
+
+            if ($address) {
+                return $address
+            }
+        }
+    } catch {
+    }
+
+    try {
+        return Get-NetIPAddress -AddressFamily IPv4 |
+            Where-Object {
+                $_.IPAddress -notlike '127.*' -and
+                $_.IPAddress -notlike '169.254.*' -and
+                $_.PrefixOrigin -ne 'WellKnown' -and
+                $_.AddressState -eq 'Preferred'
+            } |
+            Select-Object -First 1 -ExpandProperty IPAddress
+    } catch {
+        return $null
+    }
+}
+
 try {
-    $ipv4 = Get-NetIPAddress -AddressFamily IPv4 |
-        Where-Object { $_.IPAddress -notlike '127.*' -and $_.PrefixOrigin -ne 'WellKnown' } |
-        Select-Object -First 1 -ExpandProperty IPAddress
+    $ipv4 = Get-BestLanIPv4
     if ($ipv4) {
         $lanUrl = "http://$ipv4`:$port"
         $lanInventoryUrl = "$lanUrl/inventory"
@@ -47,6 +82,10 @@ if ($env:APP_URL) {
     }
 } elseif ($lanInventoryUrl) {
     $sharedInventoryUrl = $lanInventoryUrl
+}
+
+if ($sharedInventoryUrl) {
+    $env:APP_URL = $sharedInventoryUrl.Replace('/inventory', '')
 }
 
 $scriptName = switch ($Mode) {

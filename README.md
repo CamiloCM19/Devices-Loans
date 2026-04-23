@@ -27,6 +27,36 @@ APP_HOST=0.0.0.0 APP_PORT=8000 ./scripts/start_server_pi.sh
 RFID_READER_DRIVER=mfrc522 ./scripts/start_rfid_listener.sh
 ```
 
+## Lector MFRC522 en un dispositivo remoto
+
+Si el lector MFRC522 esta conectado por USB/serial a otro equipo de la red, ese
+equipo tambien puede leer tags y reenviarlos al servidor central.
+
+En el dispositivo remoto configura:
+
+```bash
+RFID_REMOTE_API_URL=http://IP-DEL-SERVIDOR:8000
+RFID_REMOTE_API_TOKEN=
+RFID_READER_DRIVER=mfrc522
+RFID_SERIAL_DEVICE=auto
+```
+
+Luego inicia el listener remoto:
+
+```bash
+./scripts/start_rfid_listener.sh
+```
+
+En Windows:
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File scripts/start_rfid_listener.ps1
+```
+
+El listener acepta tanto la base del servidor como la URL completa del endpoint
+`/inventory/scan/rfid`. Cada UID leido por el equipo remoto se envia al servidor
+central para actualizar inventario, telemetria y flujo de prestamo/devolucion.
+
 <p align="center"><a href="https://laravel.com" target="_blank"><img src="https://raw.githubusercontent.com/laravel/art/master/logo-lockup/5%20SVG/2%20CMYK/1%20Full%20Color/laravel-logolockup-cmyk-red.svg" width="400" alt="Laravel Logo"></a></p>
 
 <p align="center">

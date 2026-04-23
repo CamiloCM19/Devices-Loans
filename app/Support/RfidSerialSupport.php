@@ -68,6 +68,34 @@ final class RfidSerialSupport
         return null;
     }
 
+    public static function normalizeRemoteApiUrl(?string $value): ?string
+    {
+        $value = trim((string) $value);
+        if ($value === '') {
+            return null;
+        }
+
+        if (preg_match('#^https?://#i', $value) !== 1) {
+            $value = 'http://' . ltrim($value, '/');
+        }
+
+        $parts = parse_url($value);
+        if (!is_array($parts) || empty($parts['host'])) {
+            return null;
+        }
+
+        $path = trim((string) ($parts['path'] ?? ''));
+        if ($path === '' || $path === '/') {
+            return rtrim($value, '/') . '/inventory/scan/rfid';
+        }
+
+        if (preg_match('#/inventory/scan/rfid/?$#', $path) === 1) {
+            return rtrim($value, '/');
+        }
+
+        return rtrim($value, '/') . '/inventory/scan/rfid';
+    }
+
     /**
      * @param  array{status?: string, port?: string, friendly_name?: string, instance_id?: string}  $candidate
      */

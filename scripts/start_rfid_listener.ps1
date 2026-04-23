@@ -12,17 +12,74 @@ $frameIdleMs = if ($env:RFID_SERIAL_FRAME_IDLE_MS) { $env:RFID_SERIAL_FRAME_IDLE
 $reconnectDelay = if ($env:RFID_SERIAL_RECONNECT_DELAY) { $env:RFID_SERIAL_RECONNECT_DELAY } else { "2" }
 $appPort = if ($env:APP_PORT) { $env:APP_PORT } else { "8000" }
 $sharedUrl = if ($env:APP_URL) { $env:APP_URL } else { $null }
+$remoteApiUrl = if ($env:RFID_REMOTE_API_URL) { $env:RFID_REMOTE_API_URL } else { $null }
 
-if (-not $sharedUrl) {
+function Test-IsLoopbackUrl {
+    param(
+        [string]$Url
+    )
+
+    if (-not $Url) {
+        return $true
+    }
+
     try {
-        $ipv4 = Get-NetIPAddress -AddressFamily IPv4 |
-            Where-Object { $_.IPAddress -notlike '127.*' -and $_.PrefixOrigin -ne 'WellKnown' } |
+        $uri = [Uri]$Url
+        return $uri.Host -in @("localhost", "127.0.0.1", "::1", "0.0.0.0")
+    } catch {
+        return $true
+    }
+}
+
+function Get-BestLanIPv4 {
+    try {
+        $route = Get-NetRoute -AddressFamily IPv4 -DestinationPrefix "0.0.0.0/0" |
+            Sort-Object RouteMetric, InterfaceMetric |
+            Select-Object -First 1
+
+        if ($route) {
+            $address = Get-NetIPAddress -AddressFamily IPv4 -InterfaceIndex $route.InterfaceIndex |
+                Where-Object {
+                    $_.IPAddress -notlike "127.*" -and
+                    $_.IPAddress -notlike "169.254.*" -and
+                    $_.PrefixOrigin -ne "WellKnown" -and
+                    $_.AddressState -eq "Preferred"
+                } |
+                Select-Object -First 1 -ExpandProperty IPAddress
+
+            if ($address) {
+                return $address
+            }
+        }
+    } catch {
+    }
+
+    try {
+        return Get-NetIPAddress -AddressFamily IPv4 |
+            Where-Object {
+                $_.IPAddress -notlike "127.*" -and
+                $_.IPAddress -notlike "169.254.*" -and
+                $_.PrefixOrigin -ne "WellKnown" -and
+                $_.AddressState -eq "Preferred"
+            } |
             Select-Object -First 1 -ExpandProperty IPAddress
+    } catch {
+        return $null
+    }
+}
+
+if (Test-IsLoopbackUrl $sharedUrl) {
+    try {
+        $ipv4 = Get-BestLanIPv4
         if ($ipv4) {
             $sharedUrl = "http://$ipv4`:$appPort"
         }
     } catch {
     }
+}
+
+if ($sharedUrl) {
+    $env:APP_URL = $sharedUrl
 }
 
 Write-Host "[rfid] NFC/RFID serial listener started"
@@ -34,6 +91,9 @@ Write-Host "[rfid] Baud: $baud"
 Write-Host "[rfid] Source: $source"
 if ($sharedUrl) {
     Write-Host "[rfid] Shared inventory URL: $sharedUrl/inventory"
+}
+if ($remoteApiUrl) {
+    Write-Host "[rfid] Remote server target: $remoteApiUrl"
 }
 
 try {
