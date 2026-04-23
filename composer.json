@@ -46,15 +46,15 @@
         ],
         "dev:win": [
             "Composer\\Config::disableProcessTimeout",
-            "npx concurrently -c \"#93c5fd,#c4b5fd,#fdba74\" \"php artisan serve --host=0.0.0.0 --port=8000\" \"php artisan queue:listen --tries=1 --timeout=0\" \"npm run dev\" --names=server,queue,vite --kill-others"
+            "npx concurrently -c \"#93c5fd,#c4b5fd,#fdba74\" \"powershell -NoProfile -ExecutionPolicy Bypass -File scripts/start_server_win.ps1\" \"php artisan queue:listen --tries=1 --timeout=0\" \"npm run dev\" --names=server,queue,vite --kill-others"
         ],
         "dev:win:serial": [
             "Composer\\Config::disableProcessTimeout",
-            "npx concurrently -c \"#93c5fd,#c4b5fd,#fdba74,#34d399\" \"php artisan serve --host=0.0.0.0 --port=8000\" \"php artisan queue:listen --tries=1 --timeout=0\" \"npm run dev\" \"powershell -NoProfile -ExecutionPolicy Bypass -File scripts/start_rfid_listener.ps1\" --names=server,queue,vite,rfid --kill-others"
+            "npx concurrently -c \"#93c5fd,#c4b5fd,#fdba74,#34d399\" \"powershell -NoProfile -ExecutionPolicy Bypass -File scripts/start_server_win.ps1\" \"php artisan queue:listen --tries=1 --timeout=0\" \"npm run dev\" \"powershell -NoProfile -ExecutionPolicy Bypass -File scripts/start_rfid_listener.ps1\" --names=server,queue,vite,rfid --kill-others"
         ],
         "dev:win:rfid": [
             "Composer\\Config::disableProcessTimeout",
-            "npx concurrently -c \"#93c5fd,#c4b5fd,#fdba74,#34d399\" \"php artisan serve --host=0.0.0.0 --port=8000\" \"php artisan queue:listen --tries=1 --timeout=0\" \"npm run dev\" \"powershell -NoProfile -ExecutionPolicy Bypass -File scripts/start_rfid_listener.ps1\" --names=server,queue,vite,rfid --kill-others"
+            "npx concurrently -c \"#93c5fd,#c4b5fd,#fdba74,#34d399\" \"powershell -NoProfile -ExecutionPolicy Bypass -File scripts/start_server_win.ps1\" \"php artisan queue:listen --tries=1 --timeout=0\" \"npm run dev\" \"powershell -NoProfile -ExecutionPolicy Bypass -File scripts/start_rfid_listener.ps1\" --names=server,queue,vite,rfid --kill-others"
         ],
         "rfid:win": [
             "powershell -NoProfile -ExecutionPolicy Bypass -File scripts/start_rfid_listener.ps1"

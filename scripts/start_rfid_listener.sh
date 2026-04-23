@@ -16,9 +16,21 @@ RECONNECT_DELAY="${RFID_SERIAL_RECONNECT_DELAY:-2}"
 FRAME_IDLE_MS="${RFID_SERIAL_FRAME_IDLE_MS:-150}"
 APP_PORT_VALUE="${APP_PORT:-8000}"
 APP_URL_VALUE="${APP_URL:-}"
+REMOTE_API_URL="${RFID_REMOTE_API_URL:-}"
 
-if [[ -z "$APP_URL_VALUE" ]] && command -v hostname >/dev/null 2>&1; then
-  LAN_IP="$(hostname -I 2>/dev/null | awk '{print $1}')"
+detect_lan_ip() {
+  if command -v ip >/dev/null 2>&1; then
+    ip route get 1 2>/dev/null | awk '{for (i = 1; i <= NF; i++) if ($i == "src") { print $(i + 1); exit }}'
+    return
+  fi
+
+  if command -v hostname >/dev/null 2>&1; then
+    hostname -I 2>/dev/null | awk '{print $1}'
+  fi
+}
+
+if [[ -z "$APP_URL_VALUE" || "$APP_URL_VALUE" == http://localhost* || "$APP_URL_VALUE" == http://127.0.0.1* ]]; then
+  LAN_IP="$(detect_lan_ip)"
   if [[ -n "${LAN_IP:-}" ]]; then
     APP_URL_VALUE="http://${LAN_IP}:${APP_PORT_VALUE}"
   fi
@@ -38,6 +50,10 @@ echo "[rfid] Baud: $BAUD"
 echo "[rfid] Source: $SOURCE"
 if [[ -n "$APP_URL_VALUE" ]]; then
   echo "[rfid] Shared inventory URL: ${APP_URL_VALUE}/inventory"
+  export APP_URL="$APP_URL_VALUE"
+fi
+if [[ -n "$REMOTE_API_URL" ]]; then
+  echo "[rfid] Remote server target: ${REMOTE_API_URL}"
 fi
 
 while true; do

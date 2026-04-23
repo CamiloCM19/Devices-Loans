@@ -10,6 +10,9 @@ Route::get('/', function () {
 });
 
 Route::get('/inventory', [InventoryController::class, 'index'])->name('inventory.index');
+Route::get('/inventory/guia', function () {
+    return view('workflow-guide');
+})->name('inventory.workflow');
 Route::post('/inventory/scan', [InventoryController::class, 'procesarInput'])->name('inventory.scan');
 Route::post('/inventory/scan/rfid', [InventoryController::class, 'procesarInputRfidApi'])->name('inventory.scan.rfid');
 Route::get('/inventory/scan/rfid/ping', [InventoryController::class, 'pingRfid'])->name('inventory.scan.rfid.ping');

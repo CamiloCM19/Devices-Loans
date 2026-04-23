@@ -56,4 +56,28 @@ class RfidSerialSupportTest extends TestCase
         $this->assertSame('COM8', $sorted[1]['port']);
         $this->assertSame('COM5', $sorted[2]['port']);
     }
+
+    public function test_it_normalizes_remote_rfid_api_urls_from_base_app_url(): void
+    {
+        $this->assertSame(
+            'http://10.0.0.25:8000/inventory/scan/rfid',
+            RfidSerialSupport::normalizeRemoteApiUrl('http://10.0.0.25:8000')
+        );
+    }
+
+    public function test_it_normalizes_remote_rfid_api_urls_without_scheme(): void
+    {
+        $this->assertSame(
+            'http://10.0.0.25:8000/inventory/scan/rfid',
+            RfidSerialSupport::normalizeRemoteApiUrl('10.0.0.25:8000')
+        );
+    }
+
+    public function test_it_keeps_full_remote_rfid_endpoint_urls(): void
+    {
+        $this->assertSame(
+            'http://10.0.0.25:8000/inventory/scan/rfid',
+            RfidSerialSupport::normalizeRemoteApiUrl('http://10.0.0.25:8000/inventory/scan/rfid')
+        );
+    }
 }

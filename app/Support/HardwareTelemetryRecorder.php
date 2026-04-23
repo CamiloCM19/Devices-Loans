@@ -192,6 +192,47 @@ class HardwareTelemetryRecorder
             ];
         })->values();
 
+        $recentBridgeTimelineEvents = HardwareTelemetryEvent::query()
+            ->where(function ($query) {
+                $query
+                    ->where('session_type', 'bridge')
+                    ->orWhere('event_type', 'like', 'backend.rfid_scan.%')
+                    ->orWhere('event_type', 'like', 'bridge.%');
+            })
+            ->orderByDesc('occurred_at')
+            ->orderByDesc('id')
+            ->limit(15)
+            ->get()
+            ->map(function (HardwareTelemetryEvent $event) {
+                return [
+                    'timestamp' => $event->occurred_at?->toIso8601String(),
+                    'event_type' => $event->event_type,
+                    'level' => $event->level,
+                    'message' => $event->message,
+                    'source' => $event->source,
+                    'session_uuid' => $event->session_uuid,
+                    'payload' => $event->payload ?? [],
+                ];
+            })
+            ->values();
+
+        $bridgeLogEvents = $bridgeLogEvents
+            ->concat($recentBridgeTimelineEvents)
+            ->unique(function (array $event) {
+                return implode('|', [
+                    $event['timestamp'] ?? '',
+                    $event['event_type'] ?? '',
+                    $event['source'] ?? '',
+                    json_encode($event['payload'] ?? []),
+                ]);
+            })
+            ->sortBy(function (array $event) {
+                return $event['timestamp'] ?? '';
+            })
+            ->values()
+            ->take(-15)
+            ->values();
+
         return [
             'browser_session' => $browserSession ? [
                 'session_uuid' => $browserSession->session_uuid,
