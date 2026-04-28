@@ -57,6 +57,66 @@ El listener acepta tanto la base del servidor como la URL completa del endpoint
 `/inventory/scan/rfid`. Cada UID leido por el equipo remoto se envia al servidor
 central para actualizar inventario, telemetria y flujo de prestamo/devolucion.
 
+## Wemos D1 mini + RFID RC522 por WiFi
+
+Tambien puedes usar un Wemos D1 mini como lector WiFi directo, sin PC intermedio.
+Cuando el Wemos enciende, se conecta a la red, conserva una IP propia y queda
+leyendo tags en automatico. Cada tag detectado se envia por HTTP al backend
+Laravel, y el backend actualiza la base de datos con el flujo existente de
+estudiante/camara, prestamo/devolucion o registro de tag nuevo.
+
+El ejemplo esta en:
+
+```text
+scripts/wemos_d1_mini_mfrc522_bridge.ino.example
+```
+
+Configura en el sketch:
+
+```cpp
+const char* WIFI_SSID = "TU_WIFI";
+const char* WIFI_PASS = "TU_PASS";
+IPAddress LOCAL_IP(192, 168, 1, 60);
+const char* API_URL = "http://IP-DEL-SERVIDOR:8000/inventory/scan/rfid";
+const char* SIGNING_KEY = "LA_MISMA_CLAVE_DEL_ENV";
+```
+
+Y en el `.env` del servidor Laravel configura la misma clave:
+
+```env
+RFID_READER_SIGNING_KEY=LA_MISMA_CLAVE_DEL_ENV
+```
+
+Cada lectura genera una firma distinta con `uid + source + nonce`. Si alguien
+manda datos sin esa firma, con una firma falsa o repite un `nonce` ya usado, el
+backend responde `401` y no procesa la lectura.
+
+Cableado recomendado:
+
+```text
+RC522 3.3V -> Wemos 3V3
+RC522 GND  -> Wemos G
+RC522 RST  -> Wemos D3
+RC522 SDA  -> Wemos D8
+RC522 SCK  -> Wemos D5
+RC522 MOSI -> Wemos D7
+RC522 MISO -> Wemos D6
+```
+
+El RC522 trabaja a 3.3V. No lo alimentes con 5V. Instala en Arduino IDE las
+librerias `MFRC522` y `ESP8266WiFi`, selecciona la placa `LOLIN(WEMOS) D1 R2 &
+mini`, sube el sketch y abre el monitor serial a `115200`.
+
+Para probar el servidor desde el navegador:
+
+```text
+http://IP-DEL-SERVIDOR:8000/inventory/scan/rfid/ping
+```
+
+Despues de subir el sketch no necesitas abrir la pagina web para que el lector
+trabaje. Basta con que el servidor Laravel este encendido en la red y que el
+Wemos pueda llegar a `API_URL`.
+
 <p align="center"><a href="https://laravel.com" target="_blank"><img src="https://raw.githubusercontent.com/laravel/art/master/logo-lockup/5%20SVG/2%20CMYK/1%20Full%20Color/laravel-logolockup-cmyk-red.svg" width="400" alt="Laravel Logo"></a></p>
 
 <p align="center">

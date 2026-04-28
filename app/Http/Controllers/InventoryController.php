@@ -214,6 +214,8 @@ class InventoryController extends Controller
             $request->input('uid', $request->input('nfc_id', $request->input('tag'))),
             [
                 'token' => $request->input('token', ''),
+                'nonce' => $request->input('nonce', ''),
+                'signature' => $request->input('signature', ''),
                 'source' => $request->input('source', 'nfc-reader'),
                 'reader_model' => $request->input('reader_model', $request->input('reader', env('RFID_READER_DRIVER', 'auto'))),
                 'bridge_session_uuid' => $request->input('bridge_session_uuid', ''),

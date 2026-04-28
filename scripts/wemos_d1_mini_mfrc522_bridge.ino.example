@@ -1,0 +1,197 @@
+#include <ESP8266WiFi.h>
+#include <ESP8266HTTPClient.h>
+#include <Hash.h>
+#include <SPI.h>
+#include <MFRC522.h>
+
+// ---------- WIFI ----------
+const char* WIFI_SSID = "TU_WIFI";
+const char* WIFI_PASS = "TU_PASS";
+
+// IP propia/fija del Wemos en tu red. Debe estar libre y en el mismo rango del router.
+// Ejemplo: si tu PC/servidor es 192.168.1.20, usa algo como 192.168.1.60.
+IPAddress LOCAL_IP(192, 168, 1, 60);
+IPAddress GATEWAY(192, 168, 1, 1);
+IPAddress SUBNET(255, 255, 255, 0);
+IPAddress DNS(8, 8, 8, 8);
+
+// Usa la IP LAN del servidor Laravel/XAMPP, nunca localhost/127.0.0.1.
+const char* API_URL = "http://192.168.1.20:8000/inventory/scan/rfid";
+// Debe ser el mismo valor de RFID_READER_SIGNING_KEY en el .env de Laravel.
+// Usa una clave larga, privada y dificil de adivinar.
+const char* SIGNING_KEY = "CAMBIA_ESTA_CLAVE_LARGA";
+const char* SOURCE_ID = "wemos-d1-mini-rfid-1";
+
+// ---------- MFRC522 / RC522 (SPI) ----------
+// Cableado recomendado Wemos D1 mini:
+// RC522 3.3V -> 3V3, GND -> G, RST -> D3, SDA/SS -> D8,
+// SCK -> D5, MOSI -> D7, MISO -> D6. No uses 5V para el RC522.
+static const uint8_t RST_PIN = D3;
+static const uint8_t SS_PIN = D8;
+MFRC522 rfid(SS_PIN, RST_PIN);
+
+// ---------- Tuning ----------
+static const uint32_t UID_COOLDOWN_MS = 1500;
+static const uint32_t WIFI_RETRY_MS = 4000;
+static const uint32_t READY_PRINT_MS = 5000;
+
+String lastUid = "";
+uint32_t lastUidMs = 0;
+uint32_t lastWifiRetryMs = 0;
+uint32_t lastReadyPrintMs = 0;
+
+String uidToHex(MFRC522::Uid uid) {
+  String out;
+  out.reserve(uid.size * 2);
+  for (byte i = 0; i < uid.size; i++) {
+    if (uid.uidByte[i] < 0x10) out += "0";
+    out += String(uid.uidByte[i], HEX);
+  }
+  out.toUpperCase();
+  return out;
+}
+
+String makeNonce() {
+  String nonce = String(ESP.getChipId(), HEX);
+  nonce += "-";
+  nonce += String(micros(), HEX);
+  nonce += "-";
+  nonce += String(random(0x7fffffff), HEX);
+  nonce.toUpperCase();
+  return nonce;
+}
+
+String makeSignature(const String& uid, const String& nonce) {
+  String payload = String(SIGNING_KEY) + "|" + uid + "|" + SOURCE_ID + "|" + nonce;
+  return sha1(payload);
+}
+
+void connectWifi() {
+  WiFi.mode(WIFI_STA);
+  WiFi.persistent(false);
+  WiFi.setAutoReconnect(true);
+  WiFi.config(LOCAL_IP, GATEWAY, SUBNET, DNS);
+  WiFi.begin(WIFI_SSID, WIFI_PASS);
+
+  Serial.print("WiFi connecting");
+  uint32_t started = millis();
+  while (WiFi.status() != WL_CONNECTED && millis() - started < 20000) {
+    delay(300);
+    Serial.print(".");
+  }
+
+  Serial.println();
+  if (WiFi.status() == WL_CONNECTED) {
+    Serial.print("WiFi OK. IP: ");
+    Serial.println(WiFi.localIP());
+    Serial.println("Modo automatico activo: acerca un tag para enviarlo al servidor.");
+  } else {
+    Serial.println("WiFi connect timeout.");
+  }
+}
+
+void ensureWifi() {
+  if (WiFi.status() == WL_CONNECTED) return;
+
+  uint32_t now = millis();
+  if (now - lastWifiRetryMs < WIFI_RETRY_MS) return;
+
+  lastWifiRetryMs = now;
+  Serial.println("WiFi disconnected, reconnecting...");
+  connectWifi();
+}
+
+void postUid(const String& uid) {
+  ensureWifi();
+  if (WiFi.status() != WL_CONNECTED) {
+    Serial.println("Tag leido, pero no hay WiFi. Reintentara con el siguiente tag.");
+    return;
+  }
+
+  WiFiClient client;
+  HTTPClient http;
+  http.setTimeout(3500);
+
+  if (!http.begin(client, API_URL)) {
+    Serial.println("HTTP begin failed.");
+    return;
+  }
+
+  http.addHeader("Content-Type", "application/json");
+
+  String nonce = makeNonce();
+  String signature = makeSignature(uid, nonce);
+  String body = "{\"uid\":\"" + uid + "\",\"source\":\"" + SOURCE_ID + "\",\"reader_model\":\"mfrc522\",\"bridge_transport\":\"wifi-http\",\"bridge_mode\":\"api\",\"nonce\":\"" + nonce + "\",\"signature\":\"" + signature + "\"";
+  body += "}";
+
+  int code = http.POST(body);
+  String resp = http.getString();
+
+  Serial.print("POST ");
+  Serial.print(code);
+  Serial.print(" -> ");
+  Serial.println(resp);
+
+  http.end();
+}
+
+void printReadyStatus() {
+  uint32_t now = millis();
+  if (now - lastReadyPrintMs < READY_PRINT_MS) return;
+
+  lastReadyPrintMs = now;
+  if (WiFi.status() == WL_CONNECTED) {
+    Serial.print("Listo. IP Wemos: ");
+    Serial.print(WiFi.localIP());
+    Serial.print(" | Enviando a: ");
+    Serial.println(API_URL);
+  } else {
+    Serial.println("Esperando WiFi para activar envio automatico de tags...");
+  }
+}
+
+void setup() {
+  Serial.begin(115200);
+  delay(200);
+  Serial.println();
+  Serial.println("Wemos D1 mini + MFRC522 bridge start");
+  randomSeed(ESP.getCycleCount());
+
+  SPI.begin();
+  rfid.PCD_Init();
+  delay(50);
+
+  connectWifi();
+  Serial.println("El lector queda trabajando solo: lee tag -> envia POST -> Laravel actualiza BD.");
+}
+
+void loop() {
+  ensureWifi();
+  printReadyStatus();
+
+  if (!rfid.PICC_IsNewCardPresent() || !rfid.PICC_ReadCardSerial()) {
+    delay(20);
+    return;
+  }
+
+  String currentUid = uidToHex(rfid.uid);
+  uint32_t now = millis();
+
+  if (currentUid == lastUid && (now - lastUidMs) < UID_COOLDOWN_MS) {
+    rfid.PICC_HaltA();
+    rfid.PCD_StopCrypto1();
+    delay(80);
+    return;
+  }
+
+  lastUid = currentUid;
+  lastUidMs = now;
+
+  Serial.print("UID read: ");
+  Serial.println(currentUid);
+  postUid(currentUid);
+
+  rfid.PICC_HaltA();
+  rfid.PCD_StopCrypto1();
+  delay(120);
+}

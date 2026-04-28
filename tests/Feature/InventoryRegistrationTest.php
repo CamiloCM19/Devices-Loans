@@ -158,6 +158,44 @@ class InventoryRegistrationTest extends TestCase
         $response->assertJsonPath('register_path', '/inventory/register/RFID_TAG_404');
     }
 
+    public function test_signed_rfid_request_is_required_when_signing_key_is_configured()
+    {
+        $_ENV['RFID_READER_SIGNING_KEY'] = 'test-signing-key';
+        $_SERVER['RFID_READER_SIGNING_KEY'] = 'test-signing-key';
+        putenv('RFID_READER_SIGNING_KEY=test-signing-key');
+
+        $this->postJson(route('inventory.scan.rfid'), [
+            'uid' => 'RFID_SIGNED_404',
+            'source' => 'wemos-test',
+            'nonce' => 'nonce-bad',
+            'signature' => 'bad-signature',
+        ])->assertStatus(401)
+            ->assertJsonPath('status', 'unauthorized');
+
+        $nonce = 'nonce-good';
+        $signature = sha1('test-signing-key|RFID_SIGNED_404|wemos-test|' . $nonce);
+
+        $this->postJson(route('inventory.scan.rfid'), [
+            'uid' => 'RFID_SIGNED_404',
+            'source' => 'wemos-test',
+            'nonce' => $nonce,
+            'signature' => $signature,
+        ])->assertStatus(404)
+            ->assertJsonPath('register_path', '/inventory/register/RFID_SIGNED_404');
+
+        $this->postJson(route('inventory.scan.rfid'), [
+            'uid' => 'RFID_SIGNED_404',
+            'source' => 'wemos-test',
+            'nonce' => $nonce,
+            'signature' => $signature,
+        ])->assertStatus(401)
+            ->assertJsonPath('status', 'unauthorized');
+
+        $_ENV['RFID_READER_SIGNING_KEY'] = '';
+        $_SERVER['RFID_READER_SIGNING_KEY'] = '';
+        putenv('RFID_READER_SIGNING_KEY');
+    }
+
     public function test_web_telemetry_collect_creates_session_and_event()
     {
         $response = $this->postJson(route('inventory.telemetry.collect'), [
@@ -388,4 +426,3 @@ class InventoryRegistrationTest extends TestCase
         Process::assertRan('echo simulated-shutdown');
     }
 }
-

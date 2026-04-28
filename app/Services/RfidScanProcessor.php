@@ -22,6 +22,8 @@ class RfidScanProcessor
      */
     public function process(?string $rawUid, array $context = []): array
     {
+        $input = $this->normalizeNfcId($rawUid);
+        $configuredSigningKey = (string) env('RFID_READER_SIGNING_KEY', '');
         $configuredToken = (string) env('RFID_READER_TOKEN', '');
         $providedToken = (string) ($context['token'] ?? '');
         $source = trim((string) ($context['source'] ?? 'nfc-reader'));
@@ -40,7 +42,32 @@ class RfidScanProcessor
 
         $this->ensureBridgeSession($bridgeSessionUuid, $source, $bridgeMetadata);
 
-        if ($configuredToken !== '' && !hash_equals($configuredToken, $providedToken)) {
+        if ($configuredSigningKey !== '') {
+            $authError = $this->validateSignedReaderRequest($configuredSigningKey, $input, $source, $context);
+            if ($authError !== null) {
+                $this->recordBridgeTelemetryEvent(
+                    $bridgeSessionUuid,
+                    $source,
+                    'backend.rfid_scan.unauthorized',
+                    'Se rechazo una lectura RFID por firma dinamica invalida.',
+                    [
+                        'ip' => $context['ip'] ?? null,
+                        'reason' => $authError,
+                    ],
+                    'warning',
+                    $bridgeMetadata
+                );
+
+                return [
+                    'body' => [
+                        'ok' => false,
+                        'status' => 'unauthorized',
+                        'message' => 'Firma RFID invalida.',
+                    ],
+                    'status_code' => 401,
+                ];
+            }
+        } elseif ($configuredToken !== '' && !hash_equals($configuredToken, $providedToken)) {
             $this->recordBridgeTelemetryEvent(
                 $bridgeSessionUuid,
                 $source,
@@ -63,7 +90,6 @@ class RfidScanProcessor
             ];
         }
 
-        $input = $this->normalizeNfcId($rawUid);
         Log::info('rfid_scan_received', [
             'source' => $source,
             'uid_raw' => $rawUid,
@@ -335,6 +361,39 @@ class RfidScanProcessor
         $value = strtoupper(trim((string) $value));
 
         return preg_replace('/[\s\-:]+/', '', $value) ?? '';
+    }
+
+    /**
+     * @param  array<string, mixed>  $context
+     */
+    private function validateSignedReaderRequest(string $signingKey, string $uid, string $source, array $context): ?string
+    {
+        $nonce = trim((string) ($context['nonce'] ?? ''));
+        $signature = strtolower(trim((string) ($context['signature'] ?? '')));
+
+        if ($uid === '') {
+            return 'empty_uid';
+        }
+
+        if ($nonce === '' || strlen($nonce) > 80) {
+            return 'invalid_nonce';
+        }
+
+        if (preg_match('/^[a-f0-9]{40}$/', $signature) !== 1) {
+            return 'invalid_signature_format';
+        }
+
+        $expectedSignature = sha1($signingKey . '|' . $uid . '|' . $source . '|' . $nonce);
+        if (!hash_equals($expectedSignature, $signature)) {
+            return 'signature_mismatch';
+        }
+
+        $nonceCacheKey = 'rfid:signature_nonce:' . sha1($source . '|' . $nonce);
+        if (!Cache::add($nonceCacheKey, true, now()->addDay())) {
+            return 'nonce_replay';
+        }
+
+        return null;
     }
 
     private function findEstudianteByNfc(string $id): ?Estudiante
